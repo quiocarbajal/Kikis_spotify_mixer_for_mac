@@ -20,22 +20,43 @@ SCOPES = [
     "user-library-modify"
 ]
 
-CACHE_PATH = os.path.join(os.path.dirname(__file__), "..", ".spotify_cache")
+def get_user_data_dir() -> str:
+    app_data = os.getenv("APP_DATA_DIR")
+    if app_data and os.path.isdir(app_data):
+        return app_data
+    local_cache = os.path.join(os.path.dirname(__file__), "..", ".spotify_cache")
+    if os.path.exists(local_cache) and os.access(os.path.dirname(local_cache), os.W_OK):
+        return os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    
+    app_support = os.path.expanduser("~/Library/Application Support/KikisSpotifyMixer")
+    try:
+        os.makedirs(app_support, exist_ok=True)
+        return app_support
+    except Exception:
+        return "."
+
+DATA_DIR = get_user_data_dir()
+CACHE_PATH = os.path.join(DATA_DIR, ".spotify_cache")
 
 _playback_cache: Optional[Dict[str, Any]] = None
 _last_playback_time: float = 0.0
 PLAYBACK_CACHE_TTL = 3.0  # seconds
 
+DEFAULT_CLIENT_ID = "5422e5d127b845198527048f9f7529cf"
+DEFAULT_CLIENT_SECRET = ""
+DEFAULT_REDIRECT_URI = "http://127.0.0.1:8888/callback"
+
 def get_cache_handler() -> CacheFileHandler:
     return CacheFileHandler(cache_path=CACHE_PATH)
 
 def get_spotify_oauth() -> Optional[SpotifyOAuth]:
-    client_id = os.getenv("SPOTIFY_CLIENT_ID")
-    client_secret = os.getenv("SPOTIFY_CLIENT_SECRET")
-    redirect_uri = os.getenv("SPOTIFY_REDIRECT_URI", "http://127.0.0.1:8888/callback")
+    client_id = os.getenv("SPOTIFY_CLIENT_ID") or DEFAULT_CLIENT_ID
+    client_secret = os.getenv("SPOTIFY_CLIENT_SECRET") or DEFAULT_CLIENT_SECRET
+    redirect_uri = os.getenv("SPOTIFY_REDIRECT_URI", DEFAULT_REDIRECT_URI)
     
     if not client_id or not client_secret or client_id == "your_client_id_here":
-        return None
+        client_id = DEFAULT_CLIENT_ID
+        client_secret = DEFAULT_CLIENT_SECRET
         
     return SpotifyOAuth(
         client_id=client_id,
@@ -299,13 +320,14 @@ def search_catalog(query: str, limit: int = 20) -> List[Dict[str, Any]]:
         print(f"Catalog search error: {e}")
         return []
 
-def fetch_all_liked_songs(limit: int = 500) -> List[Dict[str, Any]]:
+def fetch_all_liked_songs_with_status(limit: int = 5000) -> Tuple[List[Dict[str, Any]], Optional[str]]:
     sp = get_spotify_client()
     if not sp:
-        return []
+        return [], "Not authenticated"
     tracks = []
     offset = 0
     batch_size = 50
+    error_msg = None
     
     while offset < limit:
         try:
@@ -336,9 +358,19 @@ def fetch_all_liked_songs(limit: int = 500) -> List[Dict[str, Any]]:
             offset += len(items)
             if len(items) < batch_size:
                 break
+            time.sleep(0.05)  # Throttling to prevent 429
         except Exception as e:
-            print(f"Error fetching saved tracks: {e}")
+            err_str = str(e)
+            if "429" in err_str or "rate limit" in err_str.lower():
+                error_msg = "Spotify API temporary rate limit reached on this Client ID. Please wait or create a fresh Client ID in Spotify Dashboard."
+            else:
+                error_msg = f"Error fetching saved tracks: {e}"
+            print(f"fetch_all_liked_songs error at offset {offset}: {e}")
             break
+    return tracks, error_msg
+
+def fetch_all_liked_songs(limit: int = 5000) -> List[Dict[str, Any]]:
+    tracks, _ = fetch_all_liked_songs_with_status(limit=limit)
     return tracks
 
 def fetch_all_playlists(limit: int = 50) -> List[Dict[str, Any]]:

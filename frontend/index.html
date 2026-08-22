@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kiki's Spotify Mixer</title>
+  <link rel="icon" type="image/jpeg" href="/icon.jpeg">
   <link rel="stylesheet" href="/style.css?v=5.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,7 +15,7 @@
     <!-- Top Header Bar -->
     <header id="top-bar">
       <div class="logo-area">
-        <div class="logo-icon">🎵</div>
+        <img src="/icon.jpeg" alt="App Icon" class="app-header-logo">
         <div class="logo-title">
           <h1>Kiki's Spotify Mixer</h1>
           <span class="sub-badge">Queue & Mix Studio</span>
@@ -24,18 +25,29 @@
       <!-- Quick Filter in Current List -->
       <div class="search-box-container">
         <span class="search-icon">🔍</span>
-        <input type="text" id="search-input" placeholder="Filter active list... (Press /)" autocomplete="off">
-        <button id="clear-search-btn" class="icon-btn hidden" title="Clear Filter">✕</button>
+        <input type="text" id="search-input" placeholder="Filter active list... (Keyboard shortcut: /)" autocomplete="off" data-tooltip-title="Filter Tracklist" data-tooltip="Press the '/' key anytime to immediately search and filter visible tracks without clicking." data-tooltip-shortcut="/" data-tooltip-pos="bottom">
+        <button id="clear-search-btn" class="icon-btn hidden" data-tooltip-title="Clear Filter" data-tooltip="Reset search filter and show all tracks.">✕</button>
       </div>
 
       <div class="top-actions">
-        <button id="sync-btn" class="btn btn-secondary" title="Sync library with Spotify">
+        <div id="lang-toggle-group" class="lang-switch-toggle" data-tooltip-title="Idioma / Language" data-tooltip="Alternar entre Español e Inglés / Switch between English & Spanish.">
+          <button type="button" id="lang-btn-en" class="lang-toggle-side" data-lang="en" title="English">
+            <span class="flag-icon">🇬🇧</span> <span class="lang-label">EN</span>
+          </button>
+          <button type="button" id="lang-btn-es" class="lang-toggle-side active" data-lang="es" title="Español (Argentina)">
+            <span class="flag-icon">🇦🇷</span> <span class="lang-label">ES</span>
+          </button>
+        </div>
+        <button id="login-btn" class="btn btn-primary hidden" data-tooltip-title="Spotify Login" data-tooltip="Connect your Spotify account to load playlists and control playback.">
+          <span class="btn-icon">🟢</span> <span class="btn-text">Log in with Spotify</span>
+        </button>
+        <button id="sync-btn" class="btn btn-secondary" data-tooltip-title="Sync Library" data-tooltip="Fetch latest liked songs, playlists, and track metadata from Spotify.">
           <span class="btn-icon">🔄</span> <span class="btn-text">Sync Library</span>
         </button>
-        <button id="settings-btn" class="btn btn-icon-only" title="Settings & Setup">
+        <button id="settings-btn" class="btn btn-icon-only" data-tooltip-title="Settings & Setup" data-tooltip="Spotify account settings, developer credentials, and anti-clumping options.">
           ⚙️
         </button>
-        <div id="connection-status-badge" class="status-badge status-offline">
+        <div id="connection-status-badge" class="status-badge status-offline" data-tooltip-title="Spotify Connection" data-tooltip="Displays connection state to Spotify Web API and local desktop app.">
           <span class="status-dot"></span>
           <span id="status-text">Checking...</span>
         </div>
@@ -49,12 +61,17 @@
         <div class="sidebar-section">
           <div class="section-title">LIBRARY</div>
           <ul class="nav-list">
-            <li class="nav-item active" data-view="all">
+            <li class="nav-item active" data-view="liked_songs" data-tooltip-title="Liked Songs" data-tooltip="All songs saved to your Spotify Liked Songs library.">
+              <span class="nav-icon">💚</span>
+              <span class="nav-label">Liked Songs</span>
+              <span class="nav-count" id="count-liked">0</span>
+            </li>
+            <li class="nav-item" data-view="all" data-tooltip-title="All Tracks" data-tooltip="Consolidated master list of all synced songs across your library.">
               <span class="nav-icon">📁</span>
               <span class="nav-label">All Tracks</span>
               <span class="nav-count" id="count-all">0</span>
             </li>
-            <li class="nav-item" data-view="untagged">
+            <li class="nav-item" data-view="untagged" data-tooltip-title="Untagged Songs" data-tooltip="Songs without any assigned custom tags. Perfect for organizing!">
               <span class="nav-icon">⭐</span>
               <span class="nav-label">Untagged Songs</span>
               <span class="nav-count" id="count-untagged">0</span>
@@ -65,29 +82,29 @@
         <div class="sidebar-section">
           <div class="section-header-flex">
             <div class="section-title">CUSTOM TAGS</div>
-            <button id="create-tag-sidebar-btn" class="icon-btn-small" title="Create New Tag">+</button>
+            <button id="create-tag-sidebar-btn" class="icon-btn-small" data-tooltip-title="New Custom Tag" data-tooltip="Create a new color-coded tag to label and filter songs.">+</button>
           </div>
 
           <!-- Boolean Filter Mode Selector -->
           <div class="filter-mode-selector">
             <span class="filter-mode-label">Tag Filter Mode:</span>
             <div class="radio-pill-group">
-              <label class="radio-pill">
+              <label class="radio-pill" data-tooltip-title="AND Mode" data-tooltip="Show only songs that contain ALL active selected tags.">
                 <input type="radio" name="filter-mode" value="AND" checked>
                 <span>AND</span>
               </label>
-              <label class="radio-pill">
+              <label class="radio-pill" data-tooltip-title="OR Mode" data-tooltip="Show songs that contain ANY of the active selected tags.">
                 <input type="radio" name="filter-mode" value="OR">
                 <span>OR</span>
               </label>
-              <label class="radio-pill">
+              <label class="radio-pill" data-tooltip-title="NOT Mode" data-tooltip="Exclude songs that have any of the active selected tags.">
                 <input type="radio" name="filter-mode" value="NOT">
                 <span>NOT</span>
               </label>
             </div>
           </div>
 
-          <div id="tags-dropzone-tip" class="drag-hint">💡 Drag songs onto any tag to label them</div>
+          <div id="tags-dropzone-tip" class="drag-hint">💡 Drag tags onto songs (or songs onto tags) to label</div>
           <div id="tags-list" class="tags-container"></div>
         </div>
 
@@ -97,7 +114,7 @@
         </div>
 
         <div class="sidebar-footer">
-          <div class="remote-info-card">
+          <div class="remote-info-card" data-tooltip-title="Android Remote URL" data-tooltip="Open this URL on your phone browser on the same Wi-Fi to control playback remotely.">
             <div class="remote-header">📱 Android Phone Access</div>
             <div class="remote-url" id="remote-url-display">http://localhost:8888</div>
           </div>
@@ -105,31 +122,39 @@
       </aside>
 
       <!-- Resizer between Sidebar & Main Content -->
-      <div id="sidebar-resizer" class="panel-resizer" title="Drag to resize sidebar"></div>
+      <div id="sidebar-resizer" class="panel-resizer" data-tooltip-title="Resize Sidebar" data-tooltip="Click and drag horizontally to resize sidebar width."></div>
 
       <!-- Center Main Window: The Active List of Songs to Play -->
       <main id="main-content">
-        <!-- Main Toolbar -->
+        <!-- Main Toolbar with Active Queue Title and Information -->
         <div id="table-toolbar">
           <div class="toolbar-left">
+            <div class="queue-heading-group">
+              <div class="queue-title-row">
+                <span class="queue-status-icon">🎧</span>
+                <span class="queue-main-title" id="active-queue-heading">Active Listening Queue</span>
+                <span class="queue-help-badge" data-tooltip-title="Active Listening Queue" data-tooltip="When you click ▶ Play List or press Space, Spotify plays these songs in the order they are shown below." data-tooltip-pos="bottom">ℹ️ Info</span>
+              </div>
+              <span class="queue-subtext" id="queue-subtext-desc">These are the songs you will hear when you hit play.</span>
+            </div>
             <div id="active-filter-chips" class="filter-chips-container"></div>
             <span id="track-count-badge" class="count-indicator">Loading tracks...</span>
           </div>
 
           <div class="toolbar-right">
-            <button id="play-active-list-btn" class="btn btn-sm btn-primary" title="Start playing from the top of this list">
+            <button id="play-active-list-btn" class="btn btn-sm btn-primary" data-tooltip-title="Play Active List" data-tooltip="Starts continuous playback from the first track in this active list.">
               ▶ Play List
             </button>
-            <button id="shuffle-active-list-btn" class="btn btn-sm shuffle-toggle-btn" title="True Mathematical Random Shuffle without changing currently playing song">
+            <button id="shuffle-active-list-btn" class="btn btn-sm shuffle-toggle-btn" data-tooltip-title="Real Random Shuffle" data-tooltip="This is a real random shuffle. It generates a completely new random order every time you activate it.">
               🔀 True Shuffle
             </button>
-            <button id="lock-order-btn" class="btn btn-sm btn-ghost" title="Lock order to prevent accidental drags or shuffles">
+            <button id="lock-order-btn" class="btn btn-sm btn-ghost" data-tooltip-title="Order Lock" data-tooltip="Toggle locking to prevent accidental drag reordering or shuffling.">
               🔓 Unlocked
             </button>
-            <button id="reset-order-btn" class="btn btn-sm btn-secondary hidden" title="Revert temporary sort back to Custom User Order">
+            <button id="reset-order-btn" class="btn btn-sm btn-secondary hidden" data-tooltip-title="Reset Sequence" data-tooltip="Revert temporary column header sorting back to your saved custom order.">
               🔄 Reset to User Order
             </button>
-            <button id="save-order-btn" class="btn btn-sm btn-accent hidden" title="Save current sorted list as new Custom User Order">
+            <button id="save-order-btn" class="btn btn-sm btn-accent hidden" data-tooltip-title="Save Sequence" data-tooltip="Save the current column-sorted list as your permanent custom order.">
               💾 Save as User Order
             </button>
           </div>
@@ -141,85 +166,97 @@
             <span class="selection-count-badge" id="selected-count-text">0 selected</span>
           </div>
           <div class="selection-actions">
-            <button id="batch-create-playlist-btn" class="btn btn-sm btn-primary">
+            <button id="batch-create-playlist-btn" class="btn btn-sm btn-primary" data-tooltip-title="Create Spotify Playlist" data-tooltip="Export all currently selected tracks to a brand new Spotify playlist.">
               ➕ Make Spotify Playlist
             </button>
-            <button id="batch-tag-btn" class="btn btn-sm btn-secondary">
+            <button id="batch-tag-btn" class="btn btn-sm btn-secondary" data-tooltip-title="Assign Tags" data-tooltip="Batch assign or modify custom tags for all selected songs." data-tooltip-shortcut="T">
               🏷️ Assign Tags
             </button>
-            <button id="batch-shuffle-btn" class="btn btn-sm btn-accent">
+            <button id="batch-shuffle-btn" class="btn btn-sm btn-accent" data-tooltip-title="Shuffle Selection" data-tooltip="This is a real random shuffle. It randomizes the selected songs every time you activate it.">
               🔀 Shuffle Selected
             </button>
-            <button id="batch-remove-tags-btn" class="btn btn-sm btn-secondary">
+            <button id="batch-remove-tags-btn" class="btn btn-sm btn-secondary" data-tooltip-title="Remove Tags" data-tooltip="Strip all custom tags from the selected songs in one click.">
               ❌ Remove Tags
             </button>
-            <button id="clear-selection-btn" class="btn btn-sm btn-ghost" title="Deselect all (Esc)">
+            <button id="clear-selection-btn" class="btn btn-sm btn-ghost" data-tooltip-title="Deselect All" data-tooltip="Clear track selection." data-tooltip-shortcut="Esc">
               Clear (Esc)
             </button>
           </div>
         </div>
+
 
         <!-- Main Tracks Table View (Active Queue) -->
         <div id="table-container" class="scrollable-table-wrap">
           <table id="tracks-table">
             <thead>
               <tr>
-                <th class="col-check"><input type="checkbox" id="select-all-checkbox" title="Select All (Cmd+A)"></th>
-                <th class="col-num sortable" data-sort="order_index">#</th>
-                <th class="col-title sortable" data-sort="title">Title</th>
-                <th class="col-artist sortable" data-sort="artist">Artist</th>
-                <th class="col-tags">Tags</th>
-                <th class="col-album sortable" data-sort="album">Album</th>
-                <th class="col-duration sortable" data-sort="duration_ms">⏱️</th>
+                <th class="col-check"><input type="checkbox" id="select-all-checkbox" data-tooltip-title="Select All" data-tooltip="Toggle selection of all visible tracks in the list." data-tooltip-shortcut="Cmd+A"></th>
+                <th class="col-num sortable" data-sort="order_index" data-tooltip-title="Sort by Number" data-tooltip="Sort tracks by custom sequence order.">#</th>
+                <th class="col-title sortable" data-sort="title" data-tooltip-title="Sort by Title" data-tooltip="Sort tracks alphabetically by song title.">Title</th>
+                <th class="col-artist sortable" data-sort="artist" data-tooltip-title="Sort by Artist" data-tooltip="Sort tracks alphabetically by primary artist name.">Artist</th>
+                <th class="col-tags" data-tooltip-title="Custom Tags" data-tooltip="Color-coded tags assigned to each song. Drag to tags in sidebar to organize.">Tags</th>
+                <th class="col-album sortable" data-sort="album" data-tooltip-title="Sort by Album" data-tooltip="Sort tracks alphabetically by album name.">Album</th>
+                <th class="col-duration sortable" data-sort="duration_ms" data-tooltip-title="Sort by Duration" data-tooltip="Sort tracks from shortest to longest duration.">⏱️</th>
               </tr>
             </thead>
             <tbody id="tracks-tbody"></tbody>
           </table>
 
+          <div id="connect-welcome-hero" class="empty-state-view hidden" style="padding: 40px 20px;">
+            <img src="/icon.jpeg" alt="App Icon" style="width: 72px; height: 72px; object-fit: contain; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.5);">
+            <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 8px;">Welcome to Kiki's Spotify Mixer</h2>
+            <p style="font-size: 13px; color: var(--text-secondary); max-width: 420px; line-height: 1.5; margin-bottom: 20px;">
+              Connect your Spotify account with 1 click to load your liked songs, browse your playlists, assign custom tags, and use True Shuffle.
+            </p>
+            <button id="hero-login-btn" class="btn btn-primary btn-lg" style="padding: 12px 28px; font-size: 14px; font-weight: 600;" data-tooltip-title="Spotify 1-Click Login" data-tooltip="Connect your Spotify account to start organizing and shuffling music.">
+              🟢 1-Click Connect with Spotify
+            </button>
+          </div>
+
           <div id="empty-state" class="empty-state-view hidden">
             <div class="empty-icon">🎵</div>
-            <h3>No Tracks in Active List</h3>
+            <h3 id="empty-state-title">No Tracks in Active List</h3>
             <p id="empty-state-desc">Drag songs from the right panel or search to add them here.</p>
           </div>
         </div>
       </main>
 
       <!-- Resizer between Main Content & Right Panel -->
-      <div id="right-panel-resizer" class="panel-resizer" title="Drag to resize right panel"></div>
+      <div id="right-panel-resizer" class="panel-resizer" data-tooltip-title="Resize Right Panel" data-tooltip="Click and drag horizontally to resize right panel width."></div>
 
       <!-- Right Panel: Dual Source Browser & Spotify Finder -->
       <aside id="right-panel">
         <!-- Tab Selector: Search vs Browse Playlist -->
         <div class="panel-tabs-bar">
-          <button id="tab-right-search" class="panel-tab-btn active">🔍 Spotify Search</button>
-          <button id="tab-right-playlist" class="panel-tab-btn">📑 Browse 2nd List</button>
+          <button id="tab-right-search" class="panel-tab-btn active" data-tooltip-title="Spotify Search" data-tooltip="Search and preview millions of tracks from Spotify's global catalog.">🔍 Spotify Search</button>
+          <button id="tab-right-playlist" class="panel-tab-btn" data-tooltip-title="Browse Playlists" data-tooltip="Browse tracks from your other Spotify playlists to drag into your queue.">📑 Browse 2nd List</button>
         </div>
 
         <!-- Search Input Controls & Modifiers -->
         <div id="right-search-controls" class="panel-subbar">
           <div class="search-input-row">
-            <input type="text" id="right-search-input" placeholder="Search Spotify catalog..." autocomplete="off">
-            <button id="right-search-submit-btn" class="btn btn-sm btn-primary" title="Search Spotify">Search</button>
+            <input type="text" id="right-search-input" placeholder="Search Spotify catalog..." autocomplete="off" data-tooltip-title="Search Catalog" data-tooltip="Enter song titles, artist names, or lyrics to search Spotify.">
+            <button id="right-search-submit-btn" class="btn btn-sm btn-primary" data-tooltip-title="Run Search" data-tooltip="Query Spotify for matching tracks.">Search</button>
           </div>
           <!-- Search Modifiers: All, Song, Artist, Lyrics -->
           <div class="search-modifiers-bar">
-            <div class="search-mod-pill active" data-mod="all" title="Search all fields">All</div>
-            <div class="search-mod-pill" data-mod="track" title="Match strictly by Song Title">🎵 Song</div>
-            <div class="search-mod-pill" data-mod="artist" title="Match strictly by Artist Name">🎤 Artist</div>
-            <div class="search-mod-pill" data-mod="lyrics" title="Search by Lyric Content">📜 Lyrics</div>
+            <div class="search-mod-pill active" data-mod="all" data-tooltip-title="All Fields" data-tooltip="Search across track titles, artists, and albums simultaneously.">All</div>
+            <div class="search-mod-pill" data-mod="track" data-tooltip-title="Song Titles Only" data-tooltip="Filter query results strictly by song title.">🎵 Song</div>
+            <div class="search-mod-pill" data-mod="artist" data-tooltip-title="Artists Only" data-tooltip="Filter query results strictly by artist name.">🎤 Artist</div>
+            <div class="search-mod-pill" data-mod="lyrics" data-tooltip-title="Lyric Search" data-tooltip="Search Spotify catalog by lyrics and spoken phrases.">📜 Lyrics</div>
           </div>
         </div>
 
         <!-- Playlist Selector Controls -->
         <div id="right-playlist-controls" class="panel-subbar hidden">
-          <select id="right-playlist-picker">
+          <select id="right-playlist-picker" data-tooltip-title="Select Playlist" data-tooltip="Choose one of your Spotify playlists to view and drag tracks from.">
             <option value="">Select Playlist to Browse...</option>
           </select>
         </div>
 
         <!-- Tag Filter Selector on Right Panel -->
         <div class="right-tag-filter-bar">
-          <select id="right-tag-picker" title="Filter Right Panel songs by Tag">
+          <select id="right-tag-picker" data-tooltip-title="Filter by Tag" data-tooltip="Filter right panel tracks by custom tags.">
             <option value="">🏷️ All Tags (Filter by Tag...)</option>
           </select>
         </div>
@@ -227,7 +264,7 @@
         <!-- Action Header -->
         <div class="right-action-header">
           <span id="right-selected-text" class="right-selected-count">0 selected</span>
-          <button id="right-add-selected-btn" class="btn btn-sm btn-primary" title="Add selected to Main Panel">
+          <button id="right-add-selected-btn" class="btn btn-sm btn-primary" data-tooltip-title="Add to Main List" data-tooltip="Append selected songs from the right panel directly into your active list.">
             ➕ Add to Main List
           </button>
         </div>
@@ -242,7 +279,7 @@
     <!-- Bottom Persistent Player Bar -->
     <footer id="player-bar">
       <div class="player-left">
-        <div class="player-track-info">
+        <div class="player-track-info" data-tooltip-title="Now Playing" data-tooltip="Shows the currently playing track and artist on Spotify.">
           <div id="player-title" class="player-title-text">Not Playing</div>
           <div id="player-artist" class="player-artist-text">Open Spotify on Mac or Android</div>
         </div>
@@ -250,23 +287,23 @@
 
       <div class="player-center">
         <div class="player-controls">
-          <button id="ctrl-prev" class="ctrl-btn" title="Previous Track (Cmd+Left)">⏮️</button>
-          <button id="ctrl-playpause" class="ctrl-btn play-btn" title="Play / Pause (Space)">▶️</button>
-          <button id="ctrl-next" class="ctrl-btn" title="Next Track (Cmd+Right)">⏭️</button>
-          <button id="ctrl-true-shuffle" class="ctrl-btn shuffle-toggle-btn" title="True Mathematical Random Shuffle">🔀 True Shuffle</button>
+          <button id="ctrl-prev" class="ctrl-btn" data-tooltip-title="Previous Track" data-tooltip="Play the previous song in queue." data-tooltip-shortcut="Cmd + ←" data-tooltip-pos="top">⏮️</button>
+          <button id="ctrl-playpause" class="ctrl-btn play-btn" data-tooltip-title="Play / Pause" data-tooltip="Toggle playback on Spotify." data-tooltip-shortcut="Space" data-tooltip-pos="top">▶️</button>
+          <button id="ctrl-next" class="ctrl-btn" data-tooltip-title="Next Track" data-tooltip="Skip to the next song in queue." data-tooltip-shortcut="Cmd + →" data-tooltip-pos="top">⏭️</button>
+          <button id="ctrl-true-shuffle" class="ctrl-btn shuffle-toggle-btn" data-tooltip-title="Real Random Shuffle" data-tooltip="This is a real random shuffle. It generates a completely new random order every time you activate it." data-tooltip-pos="top">🔀 True Shuffle</button>
         </div>
-        <div class="progress-bar-wrap" id="progress-bar-wrap" style="width: 340px; margin-top: 4px;">
+        <div class="progress-bar-wrap" id="progress-bar-wrap" style="width: 340px; margin-top: 4px;" data-tooltip-title="Playback Progress" data-tooltip="Displays playback progress of current song." data-tooltip-pos="top">
           <div class="progress-bar-fill" id="progress-bar-fill"></div>
         </div>
       </div>
 
       <div class="player-right">
-        <div class="volume-container">
+        <div class="volume-container" data-tooltip-title="Volume" data-tooltip="Adjust Spotify streaming volume level." data-tooltip-pos="top">
           <span class="vol-icon">🔊</span>
           <input type="range" id="volume-slider" min="0" max="100" value="50" class="volume-slider">
         </div>
         <div class="device-picker-wrap">
-          <select id="device-select" class="device-dropdown" title="Select Playback Device">
+          <select id="device-select" class="device-dropdown" data-tooltip-title="Playback Device" data-tooltip="Select active Spotify Connect output device (Mac, Phone, Speaker)." data-tooltip-pos="top">
             <option value="">📱 Select Device</option>
           </select>
         </div>
@@ -381,36 +418,54 @@
   <div id="settings-modal" class="modal-overlay hidden">
     <div class="modal-card">
       <div class="modal-header">
-        <h3>⚙️ Setup & Settings</h3>
+        <h3>⚙️ Spotify Account & Settings</h3>
         <button id="close-settings-modal" class="icon-btn">✕</button>
       </div>
       <div class="modal-body">
-        <div class="settings-group">
-          <h4>1. Spotify Developer Credentials</h4>
-          <p class="settings-desc">
-            Get credentials from <a href="https://developer.spotify.com/dashboard" target="_blank" class="link">developer.spotify.com/dashboard</a>.
+        <div class="settings-group" style="text-align: center; padding: 12px 0;">
+          <button id="modal-1click-login-btn" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 14px; font-weight: 600;">
+            🟢 1-Click Log in with Spotify
+          </button>
+          <p style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;">
+            Connects your regular Spotify account. No developer account required.
           </p>
-          <div class="form-field">
-            <label>Client ID:</label>
-            <input type="text" id="settings-client-id" placeholder="Paste Client ID here">
-          </div>
-          <div class="form-field">
-            <label>Client Secret:</label>
-            <input type="password" id="settings-client-secret" placeholder="Paste Client Secret here">
-          </div>
-          <div class="form-field">
-            <label>Redirect URI:</label>
-            <input type="text" id="settings-redirect-uri" value="http://127.0.0.1:8888/callback" readonly>
-          </div>
-          <button id="save-credentials-btn" class="btn btn-primary">Save & Connect Spotify</button>
         </div>
 
         <div class="settings-group">
-          <h4>2. Playback Preferences</h4>
+          <h4>Playback Preferences</h4>
           <label class="checkbox-label">
             <input type="checkbox" id="setting-avoid-artists" checked>
             <span>Anti-Clumping: Avoid consecutive songs by the same artist during True Shuffle</span>
           </label>
+        </div>
+
+        <details style="margin-top: 14px; border-top: 1px solid var(--border-subtle); padding-top: 10px;">
+          <summary style="font-size: 11px; color: var(--text-muted); cursor: pointer; user-select: none;">
+            🛠️ Advanced: Custom Spotify Developer App (Optional)
+          </summary>
+          <div style="margin-top: 10px;">
+            <div class="form-field">
+              <label>Client ID:</label>
+              <input type="text" id="settings-client-id" placeholder="Paste Client ID here">
+            </div>
+            <div class="form-field">
+              <label>Client Secret:</label>
+              <input type="password" id="settings-client-secret" placeholder="Paste Client Secret here">
+            </div>
+            <div class="form-field">
+              <label>Redirect URI:</label>
+              <input type="text" id="settings-redirect-uri" value="http://127.0.0.1:8888/callback" readonly>
+            </div>
+            <button id="save-credentials-btn" class="btn btn-secondary btn-sm" style="width: 100%; margin-top: 6px;">
+              Save Custom Developer Keys
+            </button>
+          </div>
+        </details>
+
+        <div style="margin-top: 16px; border-top: 1px solid var(--border-subtle); padding-top: 14px; text-align: center;">
+          <button id="logout-btn" class="btn btn-ghost btn-sm" style="color: #ef4444; border: 1px solid #ef444433; width: 100%;">
+            🚪 Log Out & Reset Cached Library
+          </button>
         </div>
       </div>
       <div class="modal-footer">

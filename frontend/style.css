@@ -63,12 +63,21 @@ body {
 .logo-area {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-width: 220px;
 }
 
+.app-header-logo {
+  height: 32px;
+  width: auto;
+  max-width: 44px;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
 .logo-icon { font-size: 20px; }
-.logo-title h1 { font-size: 15px; font-weight: 700; }
+.logo-title h1 { font-size: 15px; font-weight: 700; line-height: 1.1; }
 .sub-badge { font-size: 10px; color: var(--spotify-green); font-weight: 600; text-transform: uppercase; }
 
 .search-box-container {
@@ -270,17 +279,57 @@ body {
 }
 
 #table-toolbar {
-  height: 42px;
+  height: 48px;
   padding: 0 14px;
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
   background-color: var(--bg-main);
-  gap: 8px;
+  gap: 12px;
 }
-.toolbar-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.toolbar-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .toolbar-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+.queue-heading-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.queue-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.queue-status-icon {
+  font-size: 13px;
+}
+.queue-main-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.queue-help-badge {
+  font-size: 9.5px;
+  color: var(--text-muted);
+  background-color: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  padding: 1px 6px;
+  border-radius: 10px;
+  cursor: default;
+  transition: all 0.15s ease;
+}
+.queue-help-badge:hover {
+  color: var(--spotify-green);
+  border-color: var(--spotify-green);
+}
+.queue-subtext {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 .filter-chips-container { display: flex; gap: 4px; }
 .filter-chip {
   background-color: rgba(29, 185, 84, 0.15);
@@ -295,7 +344,7 @@ body {
   gap: 3px;
   cursor: pointer;
 }
-.count-indicator { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.count-indicator { font-size: 11px; color: var(--spotify-green); font-weight: 600; white-space: nowrap; background: rgba(29, 185, 84, 0.08); padding: 2px 6px; border-radius: 6px; }
 
 /* --- Sticky Floating Multi-Select Action Bar --- */
 .floating-action-bar {
@@ -363,6 +412,11 @@ body {
 .track-row.dragging { opacity: 0.4; background-color: var(--bg-surface-2); }
 .track-row.drop-target-above { border-top: 2px solid var(--spotify-green) !important; }
 .track-row.drop-target-below { border-bottom: 2px solid var(--spotify-green) !important; }
+.track-row.drop-target-tag {
+  background-color: rgba(29, 185, 84, 0.2) !important;
+  outline: 2px dashed var(--spotify-green) !important;
+  outline-offset: -2px;
+}
 
 #tracks-table td { padding: 6px 8px; vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -662,6 +716,42 @@ body {
 .btn-ghost:hover { color: #fff; background-color: rgba(255, 255, 255, 0.05); }
 .btn-sm { padding: 3px 8px; font-size: 11px; border-radius: 12px; }
 .btn-icon-only { padding: 5px; border-radius: 50%; font-size: 12px; }
+.lang-switch-toggle {
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 2px;
+  gap: 2px;
+  user-select: none;
+}
+.lang-toggle-side {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.lang-toggle-side:hover {
+  color: var(--text-primary);
+}
+.lang-toggle-side.active {
+  background-color: var(--spotify-green);
+  color: #000;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+.lang-toggle-side .flag-icon {
+  font-size: 13px;
+  line-height: 1;
+}
 .icon-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 13px; }
 .icon-btn-small { background: none; border: 1px solid var(--border-subtle); color: var(--text-secondary); width: 18px; height: 18px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .hidden { display: none !important; }
@@ -694,3 +784,63 @@ body {
 /* Toast Notifications */
 .toast-container { position: fixed; bottom: 85px; right: 16px; display: flex; flex-direction: column; gap: 6px; z-index: 200; }
 .toast { background-color: #14281b; border: 1px solid var(--spotify-green); color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 12px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5); }
+
+/* --- Sleek Floating Linger Tooltip --- */
+#app-tooltip {
+  position: fixed;
+  z-index: 99999;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(3px) scale(0.97);
+  transition: opacity 0.16s cubic-bezier(0.16, 1, 0.3, 1), transform 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  background: rgba(26, 26, 26, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+  padding: 8px 11px;
+  max-width: 250px;
+  min-width: 120px;
+  color: var(--text-primary);
+  font-size: 11px;
+  line-height: 1.45;
+  font-family: var(--font-main);
+}
+
+#app-tooltip.tooltip-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.tooltip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.tooltip-title {
+  font-weight: 700;
+  font-size: 11.5px;
+  color: #FFFFFF;
+}
+
+.tooltip-shortcut {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 9.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--spotify-green);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tooltip-body {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+

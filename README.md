@@ -1,6 +1,6 @@
 # 🎵 Kiki's Spotify Mixer for Mac
 
-> **🤖 Built with AI**: This project was conceived, designed, and generated using AI, specifically **Google Antigravity**.
+> **🤖 Built with AI**: This project was generated using AI, specifically **Google Antigravity**.
 
 A lightweight, powerful Spotify controller and library manager tailored for **macOS**. It provides **true mathematical random shuffle (Fisher-Yates)**, a **multi-label tagging system with boolean filtering and bulk management**, **drag-and-drop reordering with auto-scroll**, a **live contextual tracklist view**, and **offline AppleScript local control**.
 

@@ -27,6 +27,14 @@ def is_spotify_running() -> bool:
     res = run_applescript(script)
     return res == "true"
 
+def launch_spotify() -> bool:
+    """Launch Spotify Desktop on macOS in the background without stealing focus."""
+    try:
+        subprocess.run(["open", "-g", "-j", "-a", "/Applications/Spotify.app"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return True
+    except Exception:
+        return False
+
 def play_track(track_uri: str) -> bool:
     """Tell Spotify Desktop to play a specific track URI without stealing focus."""
     script = f'''

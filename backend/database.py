@@ -2,7 +2,23 @@ import sqlite3
 import os
 from typing import List, Dict, Any, Optional, Tuple
 
-DB_PATH = os.getenv("DATABASE_PATH", "spotify_tags.db")
+def get_user_data_dir() -> str:
+    app_data = os.getenv("APP_DATA_DIR")
+    if app_data and os.path.isdir(app_data):
+        return app_data
+    local_db = os.path.join(os.path.dirname(__file__), "..", "spotify_tags.db")
+    if os.path.exists(local_db) and os.access(os.path.dirname(local_db), os.W_OK):
+        return os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    
+    app_support = os.path.expanduser("~/Library/Application Support/KikisSpotifyMixer")
+    try:
+        os.makedirs(app_support, exist_ok=True)
+        return app_support
+    except Exception:
+        return "."
+
+DATA_DIR = get_user_data_dir()
+DB_PATH = os.getenv("DATABASE_PATH", os.path.join(DATA_DIR, "spotify_tags.db"))
 
 def get_db_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
@@ -212,7 +228,18 @@ def delete_playlist(playlist_id: str):
     conn.commit()
     conn.close()
 
-# --- Tag Operations ---
+def clear_all_data():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM track_tags;")
+    cursor.execute("DELETE FROM playlist_tracks;")
+    cursor.execute("DELETE FROM tracks;")
+    cursor.execute("DELETE FROM playlists;")
+    cursor.execute("DELETE FROM tags;")
+    conn.commit()
+    conn.close()
+
+# --- Track Operations ---
 
 def get_all_tags() -> List[Dict[str, Any]]:
     conn = get_db_connection()

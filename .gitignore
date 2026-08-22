@@ -30,5 +30,16 @@ build/
 # Editor & IDE
 .vscode/
 .idea/
+.agents/
 *.swp
 *.swo
+
+# macOS Build & Distribution Artifacts
+*.app/
+*.dmg
+**/*.dmg
+*.pkg
+*.iso
+*.dmg.tmp
+mac_app/kiki_spotify_launcher
+

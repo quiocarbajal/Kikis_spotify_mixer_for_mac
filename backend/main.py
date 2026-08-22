@@ -132,6 +132,13 @@ def save_credentials(creds: CredentialsRequest):
         
     return {"success": True, "message": "Credentials saved"}
 
+@app.post("/api/spotify/launch")
+def launch_spotify_app():
+    if sys.platform == "darwin":
+        apple_ctrl.launch_spotify()
+        return {"success": True, "launched": True}
+    return {"success": False, "detail": "Not on macOS"}
+
 @app.get("/api/auth/login")
 def auth_login():
     oauth = sp_client.get_spotify_oauth()
@@ -152,6 +159,17 @@ def auth_callback(code: Optional[str] = None, error: Optional[str] = None):
         oauth.get_access_token(code, as_dict=False)
         
     return RedirectResponse("/?auth=success")
+
+@app.post("/api/auth/logout")
+def auth_logout():
+    cache_path = sp_client.CACHE_PATH
+    if os.path.exists(cache_path):
+        try:
+            os.remove(cache_path)
+        except Exception:
+            pass
+    db.clear_all_data()
+    return {"success": True, "message": "Logged out and library reset"}
 
 # --- Search Catalog & Song Discovery ---
 
@@ -200,19 +218,19 @@ def sync_library(sync_playlists: bool = True):
         )
         
     try:
-        liked_tracks = sp_client.fetch_all_liked_songs(limit=300)
-        db.upsert_tracks(liked_tracks)
-        
-        liked_ids = [t["id"] for t in liked_tracks]
-        db.upsert_playlists([{
-            "id": "liked_songs",
-            "name": "Liked Songs",
-            "description": "Your saved Spotify tracks",
-            "image_url": "https://misc.scdn.co/liked-songs/liked-songs-300.png",
-            "total_tracks": len(liked_tracks),
-            "is_custom": 1
-        }])
-        db.set_playlist_tracks("liked_songs", liked_ids)
+        liked_tracks, liked_warning = sp_client.fetch_all_liked_songs_with_status(limit=5000)
+        if liked_tracks:
+            db.upsert_tracks(liked_tracks)
+            liked_ids = [t["id"] for t in liked_tracks]
+            db.upsert_playlists([{
+                "id": "liked_songs",
+                "name": "Liked Songs",
+                "description": "Your saved Spotify tracks",
+                "image_url": "https://misc.scdn.co/liked-songs/liked-songs-300.png",
+                "total_tracks": len(liked_tracks),
+                "is_custom": 1
+            }])
+            db.set_playlist_tracks("liked_songs", liked_ids)
         
         if sync_playlists:
             try:
@@ -231,7 +249,7 @@ def sync_library(sync_playlists: bool = True):
             except Exception as ple:
                 print(f"Error fetching playlists: {ple}")
                     
-        return {"success": True, "liked_count": len(liked_tracks)}
+        return {"success": True, "liked_count": len(liked_tracks), "warning": liked_warning}
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Sync error: {str(e)}")
