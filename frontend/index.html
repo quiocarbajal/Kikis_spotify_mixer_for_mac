@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kiki's Spotify Mixer</title>
+  <link rel="stylesheet" href="/style.css?v=5.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+  <div id="app-container">
+    <!-- Top Header Bar -->
+    <header id="top-bar">
+      <div class="logo-area">
+        <div class="logo-icon">🎵</div>
+        <div class="logo-title">
+          <h1>Kiki's Spotify Mixer</h1>
+          <span class="sub-badge">Queue & Mix Studio</span>
+        </div>
+      </div>
+
+      <!-- Quick Filter in Current List -->
+      <div class="search-box-container">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-input" placeholder="Filter active list... (Press /)" autocomplete="off">
+        <button id="clear-search-btn" class="icon-btn hidden" title="Clear Filter">✕</button>
+      </div>
+
+      <div class="top-actions">
+        <button id="sync-btn" class="btn btn-secondary" title="Sync library with Spotify">
+          <span class="btn-icon">🔄</span> <span class="btn-text">Sync Library</span>
+        </button>
+        <button id="settings-btn" class="btn btn-icon-only" title="Settings & Setup">
+          ⚙️
+        </button>
+        <div id="connection-status-badge" class="status-badge status-offline">
+          <span class="status-dot"></span>
+          <span id="status-text">Checking...</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Workspace Layout with Resizable Panels -->
+    <div id="workspace">
+      <!-- Left Sidebar: Library, Tags, Playlists -->
+      <aside id="sidebar">
+        <div class="sidebar-section">
+          <div class="section-title">LIBRARY</div>
+          <ul class="nav-list">
+            <li class="nav-item active" data-view="all">
+              <span class="nav-icon">📁</span>
+              <span class="nav-label">All Tracks</span>
+              <span class="nav-count" id="count-all">0</span>
+            </li>
+            <li class="nav-item" data-view="untagged">
+              <span class="nav-icon">⭐</span>
+              <span class="nav-label">Untagged Songs</span>
+              <span class="nav-count" id="count-untagged">0</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="section-header-flex">
+            <div class="section-title">CUSTOM TAGS</div>
+            <button id="create-tag-sidebar-btn" class="icon-btn-small" title="Create New Tag">+</button>
+          </div>
+
+          <!-- Boolean Filter Mode Selector -->
+          <div class="filter-mode-selector">
+            <span class="filter-mode-label">Tag Filter Mode:</span>
+            <div class="radio-pill-group">
+              <label class="radio-pill">
+                <input type="radio" name="filter-mode" value="AND" checked>
+                <span>AND</span>
+              </label>
+              <label class="radio-pill">
+                <input type="radio" name="filter-mode" value="OR">
+                <span>OR</span>
+              </label>
+              <label class="radio-pill">
+                <input type="radio" name="filter-mode" value="NOT">
+                <span>NOT</span>
+              </label>
+            </div>
+          </div>
+
+          <div id="tags-dropzone-tip" class="drag-hint">💡 Drag songs onto any tag to label them</div>
+          <div id="tags-list" class="tags-container"></div>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="section-title">YOUR PLAYLISTS</div>
+          <div id="playlists-list" class="playlists-container"></div>
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="remote-info-card">
+            <div class="remote-header">📱 Android Phone Access</div>
+            <div class="remote-url" id="remote-url-display">http://localhost:8888</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Resizer between Sidebar & Main Content -->
+      <div id="sidebar-resizer" class="panel-resizer" title="Drag to resize sidebar"></div>
+
+      <!-- Center Main Window: The Active List of Songs to Play -->
+      <main id="main-content">
+        <!-- Main Toolbar -->
+        <div id="table-toolbar">
+          <div class="toolbar-left">
+            <div id="active-filter-chips" class="filter-chips-container"></div>
+            <span id="track-count-badge" class="count-indicator">Loading tracks...</span>
+          </div>
+
+          <div class="toolbar-right">
+            <button id="play-active-list-btn" class="btn btn-sm btn-primary" title="Start playing from the top of this list">
+              ▶ Play List
+            </button>
+            <button id="shuffle-active-list-btn" class="btn btn-sm shuffle-toggle-btn" title="True Mathematical Random Shuffle without changing currently playing song">
+              🔀 True Shuffle
+            </button>
+            <button id="lock-order-btn" class="btn btn-sm btn-ghost" title="Lock order to prevent accidental drags or shuffles">
+              🔓 Unlocked
+            </button>
+            <button id="reset-order-btn" class="btn btn-sm btn-secondary hidden" title="Revert temporary sort back to Custom User Order">
+              🔄 Reset to User Order
+            </button>
+            <button id="save-order-btn" class="btn btn-sm btn-accent hidden" title="Save current sorted list as new Custom User Order">
+              💾 Save as User Order
+            </button>
+          </div>
+        </div>
+
+        <!-- Sticky Floating Multi-Select Action Bar -->
+        <div id="selection-action-bar" class="floating-action-bar hidden">
+          <div class="selection-info">
+            <span class="selection-count-badge" id="selected-count-text">0 selected</span>
+          </div>
+          <div class="selection-actions">
+            <button id="batch-create-playlist-btn" class="btn btn-sm btn-primary">
+              ➕ Make Spotify Playlist
+            </button>
+            <button id="batch-tag-btn" class="btn btn-sm btn-secondary">
+              🏷️ Assign Tags
+            </button>
+            <button id="batch-shuffle-btn" class="btn btn-sm btn-accent">
+              🔀 Shuffle Selected
+            </button>
+            <button id="batch-remove-tags-btn" class="btn btn-sm btn-secondary">
+              ❌ Remove Tags
+            </button>
+            <button id="clear-selection-btn" class="btn btn-sm btn-ghost" title="Deselect all (Esc)">
+              Clear (Esc)
+            </button>
+          </div>
+        </div>
+
+        <!-- Main Tracks Table View (Active Queue) -->
+        <div id="table-container" class="scrollable-table-wrap">
+          <table id="tracks-table">
+            <thead>
+              <tr>
+                <th class="col-check"><input type="checkbox" id="select-all-checkbox" title="Select All (Cmd+A)"></th>
+                <th class="col-num sortable" data-sort="order_index">#</th>
+                <th class="col-title sortable" data-sort="title">Title</th>
+                <th class="col-artist sortable" data-sort="artist">Artist</th>
+                <th class="col-tags">Tags</th>
+                <th class="col-album sortable" data-sort="album">Album</th>
+                <th class="col-duration sortable" data-sort="duration_ms">⏱️</th>
+              </tr>
+            </thead>
+            <tbody id="tracks-tbody"></tbody>
+          </table>
+
+          <div id="empty-state" class="empty-state-view hidden">
+            <div class="empty-icon">🎵</div>
+            <h3>No Tracks in Active List</h3>
+            <p id="empty-state-desc">Drag songs from the right panel or search to add them here.</p>
+          </div>
+        </div>
+      </main>
+
+      <!-- Resizer between Main Content & Right Panel -->
+      <div id="right-panel-resizer" class="panel-resizer" title="Drag to resize right panel"></div>
+
+      <!-- Right Panel: Dual Source Browser & Spotify Finder -->
+      <aside id="right-panel">
+        <!-- Tab Selector: Search vs Browse Playlist -->
+        <div class="panel-tabs-bar">
+          <button id="tab-right-search" class="panel-tab-btn active">🔍 Spotify Search</button>
+          <button id="tab-right-playlist" class="panel-tab-btn">📑 Browse 2nd List</button>
+        </div>
+
+        <!-- Search Input Controls & Modifiers -->
+        <div id="right-search-controls" class="panel-subbar">
+          <div class="search-input-row">
+            <input type="text" id="right-search-input" placeholder="Search Spotify catalog..." autocomplete="off">
+            <button id="right-search-submit-btn" class="btn btn-sm btn-primary" title="Search Spotify">Search</button>
+          </div>
+          <!-- Search Modifiers: All, Song, Artist, Lyrics -->
+          <div class="search-modifiers-bar">
+            <div class="search-mod-pill active" data-mod="all" title="Search all fields">All</div>
+            <div class="search-mod-pill" data-mod="track" title="Match strictly by Song Title">🎵 Song</div>
+            <div class="search-mod-pill" data-mod="artist" title="Match strictly by Artist Name">🎤 Artist</div>
+            <div class="search-mod-pill" data-mod="lyrics" title="Search by Lyric Content">📜 Lyrics</div>
+          </div>
+        </div>
+
+        <!-- Playlist Selector Controls -->
+        <div id="right-playlist-controls" class="panel-subbar hidden">
+          <select id="right-playlist-picker">
+            <option value="">Select Playlist to Browse...</option>
+          </select>
+        </div>
+
+        <!-- Tag Filter Selector on Right Panel -->
+        <div class="right-tag-filter-bar">
+          <select id="right-tag-picker" title="Filter Right Panel songs by Tag">
+            <option value="">🏷️ All Tags (Filter by Tag...)</option>
+          </select>
+        </div>
+
+        <!-- Action Header -->
+        <div class="right-action-header">
+          <span id="right-selected-text" class="right-selected-count">0 selected</span>
+          <button id="right-add-selected-btn" class="btn btn-sm btn-primary" title="Add selected to Main Panel">
+            ➕ Add to Main List
+          </button>
+        </div>
+
+        <!-- Selectable & Draggable Items List -->
+        <div id="right-items-container" class="right-items-container">
+          <div class="search-placeholder-text">Type above to search Spotify or choose a playlist to browse songs.</div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Bottom Persistent Player Bar -->
+    <footer id="player-bar">
+      <div class="player-left">
+        <div class="player-track-info">
+          <div id="player-title" class="player-title-text">Not Playing</div>
+          <div id="player-artist" class="player-artist-text">Open Spotify on Mac or Android</div>
+        </div>
+      </div>
+
+      <div class="player-center">
+        <div class="player-controls">
+          <button id="ctrl-prev" class="ctrl-btn" title="Previous Track (Cmd+Left)">⏮️</button>
+          <button id="ctrl-playpause" class="ctrl-btn play-btn" title="Play / Pause (Space)">▶️</button>
+          <button id="ctrl-next" class="ctrl-btn" title="Next Track (Cmd+Right)">⏭️</button>
+          <button id="ctrl-true-shuffle" class="ctrl-btn shuffle-toggle-btn" title="True Mathematical Random Shuffle">🔀 True Shuffle</button>
+        </div>
+        <div class="progress-bar-wrap" id="progress-bar-wrap" style="width: 340px; margin-top: 4px;">
+          <div class="progress-bar-fill" id="progress-bar-fill"></div>
+        </div>
+      </div>
+
+      <div class="player-right">
+        <div class="volume-container">
+          <span class="vol-icon">🔊</span>
+          <input type="range" id="volume-slider" min="0" max="100" value="50" class="volume-slider">
+        </div>
+        <div class="device-picker-wrap">
+          <select id="device-select" class="device-dropdown" title="Select Playback Device">
+            <option value="">📱 Select Device</option>
+          </select>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Custom Right-Click Context Menu for Tracks -->
+  <div id="custom-context-menu" class="context-menu hidden">
+    <div class="context-item" id="ctx-play-now">▶ Play from Here</div>
+    <div class="context-item" id="ctx-true-shuffle">🔀 True Shuffle Selected</div>
+    <div class="context-item" id="ctx-make-playlist">➕ Make Spotify Playlist...</div>
+    <div class="context-divider"></div>
+    <div class="context-item" id="ctx-assign-tags">🏷️ Assign Tags...</div>
+    <div class="context-divider"></div>
+    <div class="context-item danger" id="ctx-remove-tags">❌ Remove Tags</div>
+  </div>
+
+  <!-- Custom Right-Click Context Menu for Tags in Left Sidebar -->
+  <div id="tag-context-menu" class="context-menu hidden">
+    <div class="context-item" id="ctx-tag-rename">✏️ Rename Tag</div>
+    <div class="context-item" id="ctx-tag-color">🎨 Change Tag Color</div>
+    <div class="context-divider"></div>
+    <div class="context-item danger" id="ctx-tag-delete">🗑️ Delete Tag</div>
+  </div>
+
+  <!-- Custom Right-Click Context Menu for Playlists -->
+  <div id="playlist-context-menu" class="context-menu hidden">
+    <div class="context-item" id="ctx-playlist-rename">✏️ Rename Playlist</div>
+    <div class="context-divider"></div>
+    <div class="context-item danger" id="ctx-playlist-delete">🗑️ Delete Playlist</div>
+  </div>
+
+  <!-- Interactive Confirmation & Rename Dialog Modal -->
+  <div id="confirm-modal" class="modal-overlay hidden">
+    <div class="modal-card" style="max-width: 380px;">
+      <div class="modal-header">
+        <h3 id="confirm-modal-title">Confirm Action</h3>
+        <button id="close-confirm-modal" class="icon-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="confirm-modal-message" style="font-size: 12px; color: var(--text-secondary);"></p>
+        <div id="confirm-modal-input-group" class="form-field hidden" style="margin-top: 8px;">
+          <label id="confirm-modal-input-label">New Name:</label>
+          <input type="text" id="confirm-modal-input" placeholder="Enter tag name">
+          <input type="color" id="confirm-modal-color-input" value="#1DB954" class="hidden" style="margin-top: 6px; width: 100%; height: 32px; cursor: pointer;">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="confirm-modal-cancel-btn" class="btn btn-secondary">Cancel</button>
+        <button id="confirm-modal-submit-btn" class="btn btn-primary">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Create New Spotify Playlist from Selection -->
+  <div id="create-playlist-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>➕ Create Spotify Playlist from Selected Songs</h3>
+        <button id="close-create-playlist-modal" class="icon-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-field">
+          <label>Playlist Name:</label>
+          <input type="text" id="new-playlist-name" placeholder="e.g. Kiki's Special Mix">
+        </div>
+        <div class="form-field">
+          <label>Description (Optional):</label>
+          <input type="text" id="new-playlist-desc" placeholder="Curated with Kiki's Spotify Mixer">
+        </div>
+        <div id="create-playlist-count-hint" style="font-size: 12px; color: #1DB954; font-weight: 600;"></div>
+      </div>
+      <div class="modal-footer">
+        <button id="cancel-create-playlist-modal" class="btn btn-secondary">Cancel</button>
+        <button id="confirm-create-playlist-modal" class="btn btn-primary">Create & Sync to Spotify</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Tag Assignment -->
+  <div id="tag-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="tag-modal-title">🏷️ Assign Tags to Selected Songs</h3>
+        <button id="close-tag-modal" class="icon-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-search">
+          <input type="text" id="tag-search-input" placeholder="Search existing tags or type new tag name...">
+        </div>
+
+        <div class="modal-section-title">SELECT TAGS:</div>
+        <div id="modal-tags-checklist" class="modal-tags-checklist"></div>
+
+        <div class="create-new-tag-box">
+          <div class="create-tag-row">
+            <input type="text" id="new-tag-name-input" placeholder="New tag name (e.g. Focus, Energetic)">
+            <input type="color" id="new-tag-color-input" value="#1DB954" title="Choose Tag Color">
+            <button id="create-tag-submit-btn" class="btn btn-sm btn-primary">+ Add Tag</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="cancel-tag-modal" class="btn btn-secondary">Cancel</button>
+        <button id="apply-tag-modal" class="btn btn-accent">Apply Tags</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Settings -->
+  <div id="settings-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>⚙️ Setup & Settings</h3>
+        <button id="close-settings-modal" class="icon-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="settings-group">
+          <h4>1. Spotify Developer Credentials</h4>
+          <p class="settings-desc">
+            Get credentials from <a href="https://developer.spotify.com/dashboard" target="_blank" class="link">developer.spotify.com/dashboard</a>.
+          </p>
+          <div class="form-field">
+            <label>Client ID:</label>
+            <input type="text" id="settings-client-id" placeholder="Paste Client ID here">
+          </div>
+          <div class="form-field">
+            <label>Client Secret:</label>
+            <input type="password" id="settings-client-secret" placeholder="Paste Client Secret here">
+          </div>
+          <div class="form-field">
+            <label>Redirect URI:</label>
+            <input type="text" id="settings-redirect-uri" value="http://127.0.0.1:8888/callback" readonly>
+          </div>
+          <button id="save-credentials-btn" class="btn btn-primary">Save & Connect Spotify</button>
+        </div>
+
+        <div class="settings-group">
+          <h4>2. Playback Preferences</h4>
+          <label class="checkbox-label">
+            <input type="checkbox" id="setting-avoid-artists" checked>
+            <span>Anti-Clumping: Avoid consecutive songs by the same artist during True Shuffle</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="close-settings-btn-bottom" class="btn btn-secondary">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="/app.js?v=5.0"></script>
+</body>
+</html>
