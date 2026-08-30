@@ -78,13 +78,15 @@ def get_spotify_client() -> Optional[spotipy.Spotify]:
     if oauth.is_token_expired(token_info):
         try:
             token_info = oauth.refresh_access_token(token_info["refresh_token"])
-        except Exception:
-            # Stale / mismatched token
-            try:
-                if os.path.exists(CACHE_PATH):
-                    os.remove(CACHE_PATH)
-            except Exception:
-                pass
+        except Exception as e:
+            err_msg = str(e).lower()
+            # Only delete cache if refresh token was explicitly revoked by Spotify
+            if "invalid_grant" in err_msg or "revoked" in err_msg:
+                try:
+                    if os.path.exists(CACHE_PATH):
+                        os.remove(CACHE_PATH)
+                except Exception:
+                    pass
             return None
             
     return spotipy.Spotify(

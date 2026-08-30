@@ -239,6 +239,15 @@ def clear_all_data():
     conn.commit()
     conn.close()
 
+def get_total_track_count() -> int:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM tracks;")
+    row = cursor.fetchone()
+    count = row[0] if row else 0
+    conn.close()
+    return count
+
 # --- Track Operations ---
 
 def get_all_tags() -> List[Dict[str, Any]]:

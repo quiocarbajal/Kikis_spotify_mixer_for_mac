@@ -97,14 +97,25 @@ class ExportTagRequest(BaseModel):
 
 # --- API Endpoints ---
 
+sync_state: Dict[str, Any] = {
+    "is_syncing": False,
+    "stage": "idle",  # "idle", "liked_songs", "playlists", "done", "error"
+    "status_message": "",
+    "liked_count": 0,
+    "playlists_synced": 0,
+    "total_playlists": 0,
+    "error": None
+}
+
 @app.get("/api/status")
 def get_status():
-    has_creds = bool(os.getenv("SPOTIFY_CLIENT_ID") and os.getenv("SPOTIFY_CLIENT_ID") != "your_client_id_here")
-    auth = sp_client.is_authenticated() if has_creds else False
+    auth = sp_client.is_authenticated()
+    has_creds = bool((os.getenv("SPOTIFY_CLIENT_ID") and os.getenv("SPOTIFY_CLIENT_ID") != "your_client_id_here") or sp_client.DEFAULT_CLIENT_ID)
     is_mac = sys.platform == "darwin"
     mac_app_running = apple_ctrl.is_spotify_running() if is_mac else False
     local_ip = get_local_ip()
     port = os.getenv("PORT", "8888")
+    total_local_tracks = db.get_total_track_count() if auth else 0
     
     return {
         "authenticated": auth,
@@ -113,8 +124,15 @@ def get_status():
         "mac_spotify_running": mac_app_running,
         "local_ip": local_ip,
         "port": port,
-        "access_url": f"http://{local_ip}:{port}"
+        "access_url": f"http://{local_ip}:{port}",
+        "is_syncing": sync_state["is_syncing"],
+        "has_synced_tracks": total_local_tracks > 0,
+        "total_tracks": total_local_tracks
     }
+
+@app.get("/api/sync/status")
+def get_sync_status():
+    return sync_state
 
 @app.post("/api/credentials")
 def save_credentials(creds: CredentialsRequest):
@@ -217,9 +235,20 @@ def sync_library(sync_playlists: bool = True):
             detail="Not authenticated with Spotify. Please click ⚙️ Settings and connect your Spotify account first."
         )
         
+    global sync_state
+    sync_state["is_syncing"] = True
+    sync_state["stage"] = "liked_songs"
+    sync_state["status_message"] = "Fetching your Liked Songs from Spotify..."
+    sync_state["error"] = None
+    sync_state["liked_count"] = 0
+    sync_state["playlists_synced"] = 0
+    sync_state["total_playlists"] = 0
+
     try:
         liked_tracks, liked_warning = sp_client.fetch_all_liked_songs_with_status(limit=5000)
+        sync_state["liked_count"] = len(liked_tracks)
         if liked_tracks:
+            sync_state["status_message"] = f"Saving {len(liked_tracks)} Liked Songs to library..."
             db.upsert_tracks(liked_tracks)
             liked_ids = [t["id"] for t in liked_tracks]
             db.upsert_playlists([{
@@ -233,13 +262,19 @@ def sync_library(sync_playlists: bool = True):
             db.set_playlist_tracks("liked_songs", liked_ids)
         
         if sync_playlists:
+            sync_state["stage"] = "playlists"
+            sync_state["status_message"] = "Fetching your Spotify playlists..."
             try:
                 user_playlists = sp_client.fetch_all_playlists(limit=25)
+                sync_state["total_playlists"] = len(user_playlists)
                 db.upsert_playlists(user_playlists)
                 
                 # Fetch tracks for all user playlists
-                for p in user_playlists:
+                for idx, p in enumerate(user_playlists):
                     try:
+                        p_name = p.get("name", "Playlist")
+                        sync_state["status_message"] = f"Syncing playlist '{p_name}' ({idx + 1}/{len(user_playlists)})..."
+                        sync_state["playlists_synced"] = idx + 1
                         p_tracks = sp_client.fetch_playlist_tracks(p["id"], limit=200)
                         if p_tracks:
                             db.upsert_tracks(p_tracks)
@@ -249,9 +284,21 @@ def sync_library(sync_playlists: bool = True):
             except Exception as ple:
                 print(f"Error fetching playlists: {ple}")
                     
-        return {"success": True, "liked_count": len(liked_tracks), "warning": liked_warning}
+        sync_state["is_syncing"] = False
+        sync_state["stage"] = "done"
+        sync_state["status_message"] = "Sync complete!"
+        return {
+            "success": True,
+            "liked_count": len(liked_tracks),
+            "playlists_count": sync_state["total_playlists"],
+            "warning": liked_warning
+        }
     except Exception as e:
         traceback.print_exc()
+        sync_state["is_syncing"] = False
+        sync_state["stage"] = "error"
+        sync_state["error"] = str(e)
+        sync_state["status_message"] = f"Sync error: {str(e)}"
         raise HTTPException(status_code=500, detail=f"Sync error: {str(e)}")
 
 @app.get("/api/tracks")
@@ -272,6 +319,21 @@ def get_tracks(
             if p_tracks:
                 db.upsert_tracks(p_tracks)
                 db.set_playlist_tracks(playlist_id, [t["id"] for t in p_tracks])
+    elif playlist_id == "liked_songs" or (not playlist_id and not tags and not search and not untagged_only):
+        existing = db.get_tracks_query(playlist_id="liked_songs")
+        if not existing and sp_client.is_authenticated():
+            liked_tracks, _ = sp_client.fetch_all_liked_songs_with_status(limit=500)
+            if liked_tracks:
+                db.upsert_tracks(liked_tracks)
+                db.upsert_playlists([{
+                    "id": "liked_songs",
+                    "name": "Liked Songs",
+                    "description": "Your saved Spotify tracks",
+                    "image_url": "https://misc.scdn.co/liked-songs/liked-songs-300.png",
+                    "total_tracks": len(liked_tracks),
+                    "is_custom": 1
+                }])
+                db.set_playlist_tracks("liked_songs", [t["id"] for t in liked_tracks])
 
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
     tracks = db.get_tracks_query(

@@ -43,6 +43,9 @@ chmod +x "$APP_DIR/Contents/MacOS/kiki_spotify_launcher"
 cp app_icon.icns "$APP_DIR/Contents/Resources/AppIcon.icns"
 cp -R backend "$APP_DIR/Contents/Resources/backend"
 cp -R frontend "$APP_DIR/Contents/Resources/frontend"
+if [ -d ".venv" ]; then
+    cp -R .venv "$APP_DIR/Contents/Resources/venv"
+fi
 cp requirements.txt "$APP_DIR/Contents/Resources/requirements.txt"
 cp .env.example "$APP_DIR/Contents/Resources/.env.example"
 echo -n "APPL????" > "$APP_DIR/Contents/PkgInfo"

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kiki's Spotify Mixer</title>
   <link rel="icon" type="image/jpeg" href="/icon.jpeg">
-  <link rel="stylesheet" href="/style.css?v=5.0">
+  <link rel="stylesheet" href="/style.css?v=6.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -41,10 +41,7 @@
         <button id="login-btn" class="btn btn-primary hidden" data-tooltip-title="Spotify Login" data-tooltip="Connect your Spotify account to load playlists and control playback.">
           <span class="btn-icon">🟢</span> <span class="btn-text">Log in with Spotify</span>
         </button>
-        <button id="sync-btn" class="btn btn-secondary" data-tooltip-title="Sync Library" data-tooltip="Fetch latest liked songs, playlists, and track metadata from Spotify.">
-          <span class="btn-icon">🔄</span> <span class="btn-text">Sync Library</span>
-        </button>
-        <button id="settings-btn" class="btn btn-icon-only" data-tooltip-title="Settings & Setup" data-tooltip="Spotify account settings, developer credentials, and anti-clumping options.">
+        <button id="settings-btn" class="settings-gear-btn" data-tooltip-title="Settings & Setup" data-tooltip="Spotify account settings, developer credentials, and anti-clumping options.">
           ⚙️
         </button>
         <div id="connection-status-badge" class="status-badge status-offline" data-tooltip-title="Spotify Connection" data-tooltip="Displays connection state to Spotify Web API and local desktop app.">
@@ -211,6 +208,25 @@
             <button id="hero-login-btn" class="btn btn-primary btn-lg" style="padding: 12px 28px; font-size: 14px; font-weight: 600;" data-tooltip-title="Spotify 1-Click Login" data-tooltip="Connect your Spotify account to start organizing and shuffling music.">
               🟢 1-Click Connect with Spotify
             </button>
+          </div>
+
+          <!-- Main Panel Syncing State Indicator -->
+          <div id="sync-loading-hero" class="empty-state-view hidden" style="padding: 40px 20px;">
+            <div class="sync-spinner-wrapper">
+              <div class="sync-spinner-pulse"></div>
+              <div class="sync-spinner-icon">🔄</div>
+            </div>
+            <h2 id="sync-status-title" style="font-size: 19px; font-weight: 700; margin-bottom: 8px; margin-top: 14px;">Syncing your Spotify Library...</h2>
+            <p id="sync-status-desc" style="font-size: 13px; color: var(--text-secondary); max-width: 440px; line-height: 1.5; margin-bottom: 18px; text-align: center;">
+              Connecting to Spotify and downloading your Liked Songs and playlists. Please wait a moment...
+            </p>
+            <div class="sync-progress-bar-container">
+              <div id="sync-progress-fill" class="sync-progress-bar-fill"></div>
+            </div>
+            <div id="sync-stage-badge" class="sync-stage-badge">
+              <span class="pulse-dot"></span>
+              <span id="sync-stage-text">Fetching Liked Songs...</span>
+            </div>
           </div>
 
           <div id="empty-state" class="empty-state-view hidden">
@@ -476,6 +492,6 @@
 
   <div id="toast-container" class="toast-container"></div>
 
-  <script src="/app.js?v=5.0"></script>
+  <script src="/app.js?v=6.0"></script>
 </body>
 </html>

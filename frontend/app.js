@@ -37,6 +37,8 @@ const state = {
   autoScrollLocked: true,
   isMac: false,
   authenticated: false,
+  isSyncing: false,
+  hasSyncedTracks: false,
   currentLang: localStorage.getItem('kiki_spotify_lang') || 'es'
 };
 
@@ -48,7 +50,6 @@ const DOM = {
   clearSearchBtn: document.getElementById('clear-search-btn'),
   loginBtn: document.getElementById('login-btn'),
   modal1ClickLoginBtn: document.getElementById('modal-1click-login-btn'),
-  syncBtn: document.getElementById('sync-btn'),
   settingsBtn: document.getElementById('settings-btn'),
   connectionBadge: document.getElementById('connection-status-badge'),
   statusText: document.getElementById('status-text'),
@@ -81,6 +82,12 @@ const DOM = {
   emptyState: document.getElementById('empty-state'),
   connectWelcomeHero: document.getElementById('connect-welcome-hero'),
   heroLoginBtn: document.getElementById('hero-login-btn'),
+  syncLoadingHero: document.getElementById('sync-loading-hero'),
+  syncStatusTitle: document.getElementById('sync-status-title'),
+  syncStatusDesc: document.getElementById('sync-status-desc'),
+  syncProgressFill: document.getElementById('sync-progress-fill'),
+  syncStageBadge: document.getElementById('sync-stage-badge'),
+  syncStageText: document.getElementById('sync-stage-text'),
   logoutBtn: document.getElementById('logout-btn'),
   tableContainer: document.getElementById('table-container'),
   
@@ -175,7 +182,20 @@ const I18N = {
     filterPlaceholder: 'Filter active list... (Keyboard shortcut: /)',
     clearFilter: 'Clear Filter',
     loginBtn: 'Log in with Spotify',
+    loginNeeded: 'Login Needed',
     syncBtn: 'Sync Library',
+    syncingBtn: 'Syncing...',
+    syncHeroTitle: 'Syncing your Spotify Library...',
+    syncHeroDesc: 'Connecting to Spotify and downloading your Liked Songs and playlists. Please wait a moment...',
+    syncStageFetchingLiked: 'Fetching Liked Songs from Spotify...',
+    syncStageSavingLiked: 'Saving Liked Songs to library...',
+    syncStageFetchingPlaylists: 'Fetching your Spotify playlists...',
+    syncStageDone: '✅ Library synced successfully!',
+    connectHeroTitle: "Welcome to Kiki's Spotify Mixer",
+    connectHeroDesc: 'Connect your Spotify account with 1 click to load your liked songs, browse your playlists, assign custom tags, and use True Shuffle.',
+    connectHeroBtn: '🟢 1-Click Connect with Spotify',
+    connectPromptPlaylists: 'Connect Spotify to load your playlists.',
+    connectPromptTags: 'Connect Spotify to create tags.',
     settingsBtn: 'Settings & Setup',
     checking: 'Checking...',
     connected: 'Connected',
@@ -363,7 +383,20 @@ const I18N = {
     filterPlaceholder: 'Filtrar lista activa... (Atajo de teclado: /)',
     clearFilter: 'Borrar filtro',
     loginBtn: 'Iniciar sesión con Spotify',
+    loginNeeded: 'Iniciar sesión',
     syncBtn: 'Sincronizar biblioteca',
+    syncingBtn: 'Sincronizando...',
+    syncHeroTitle: 'Sincronizando tu biblioteca de Spotify...',
+    syncHeroDesc: 'Conectando a Spotify y descargando tus canciones guardadas y playlists. Por favor espera un momento...',
+    syncStageFetchingLiked: 'Obteniendo canciones guardadas de Spotify...',
+    syncStageSavingLiked: 'Guardando canciones en la biblioteca local...',
+    syncStageFetchingPlaylists: 'Obteniendo tus playlists de Spotify...',
+    syncStageDone: '✅ ¡Biblioteca sincronizada con éxito!',
+    connectHeroTitle: "Bienvenido a Kiki's Spotify Mixer",
+    connectHeroDesc: 'Conecta tu cuenta de Spotify con 1 clic para cargar tus canciones guardadas, explorar tus playlists, asignar etiquetas y usar Aleatorio Real.',
+    connectHeroBtn: '🟢 Conectar con Spotify en 1 clic',
+    connectPromptPlaylists: 'Conecta Spotify para cargar tus playlists.',
+    connectPromptTags: 'Conecta Spotify para crear etiquetas.',
     settingsBtn: 'Configuración',
     checking: 'Comprobando...',
     connected: 'Conectado',
@@ -554,11 +587,6 @@ function applyLanguage(lang) {
   if (loginText) loginText.textContent = t('loginBtn');
   DOM.loginBtn?.setAttribute('data-tooltip-title', t('tipLoginTitle'));
   DOM.loginBtn?.setAttribute('data-tooltip', t('tipLogin'));
-
-  const syncText = DOM.syncBtn?.querySelector('.btn-text');
-  if (syncText) syncText.textContent = t('syncBtn');
-  DOM.syncBtn?.setAttribute('data-tooltip-title', t('tipSyncTitle'));
-  DOM.syncBtn?.setAttribute('data-tooltip', t('tipSync'));
 
   DOM.settingsBtn?.setAttribute('data-tooltip-title', t('tipSettingsTitle'));
   DOM.settingsBtn?.setAttribute('data-tooltip', t('tipSettings'));
@@ -826,10 +854,126 @@ function applyLanguage(lang) {
   const ctxPlDelete = document.getElementById('ctx-playlist-delete');
   if (ctxPlDelete) ctxPlDelete.textContent = t('ctxDeletePlaylist');
 
+  // Sync loading hero & connect welcome hero
+  if (DOM.syncStatusTitle) DOM.syncStatusTitle.textContent = t('syncHeroTitle');
+  if (DOM.syncStatusDesc) DOM.syncStatusDesc.textContent = t('syncHeroDesc');
+  if (DOM.syncStageText && (!state.isSyncing || DOM.syncStageText.textContent.includes('Fetching') || DOM.syncStageText.textContent.includes('Obteniendo'))) {
+    DOM.syncStageText.textContent = t('syncStageFetchingLiked');
+  }
+  const heroTitle = DOM.connectWelcomeHero?.querySelector('h2');
+  if (heroTitle) heroTitle.textContent = t('connectHeroTitle');
+  const heroDesc = DOM.connectWelcomeHero?.querySelector('p');
+  if (heroDesc) heroDesc.textContent = t('connectHeroDesc');
+  const heroBtn = DOM.heroLoginBtn;
+  if (heroBtn) heroBtn.textContent = t('connectHeroBtn');
+
   // Dynamic UI re-render
   updateCounts(state.tracks.length);
   updateSelectionUI();
   renderSidebarTags();
+}
+
+// --- Sync State & Auto-Sync Management ---
+function showSyncState(stageText) {
+  state.isSyncing = true;
+  if (DOM.syncLoadingHero) {
+    DOM.syncLoadingHero.classList.remove('hidden');
+  }
+  DOM.connectWelcomeHero?.classList.add('hidden');
+  DOM.emptyState?.classList.add('hidden');
+  DOM.tracksTable?.classList.add('hidden');
+  if (DOM.syncStageText && stageText) {
+    DOM.syncStageText.textContent = stageText;
+  }
+}
+
+function hideSyncState() {
+  state.isSyncing = false;
+  DOM.syncLoadingHero?.classList.add('hidden');
+  if (state.authenticated) {
+    DOM.connectWelcomeHero?.classList.add('hidden');
+    DOM.tracksTable?.classList.remove('hidden');
+  } else {
+    DOM.connectWelcomeHero?.classList.remove('hidden');
+    DOM.tracksTable?.classList.add('hidden');
+  }
+}
+
+let isSyncInProgress = false;
+async function triggerAutoSync(silent = false) {
+  if (isSyncInProgress) return;
+  isSyncInProgress = true;
+
+  if (!silent) {
+    showSyncState(t('syncStageFetchingLiked'));
+  } else {
+    state.isSyncing = true;
+  }
+
+  let poller = setInterval(async () => {
+    try {
+      const syncStatus = await api('/api/sync/status');
+      if (syncStatus && syncStatus.is_syncing && syncStatus.status_message) {
+        if (DOM.syncStageText) {
+          DOM.syncStageText.textContent = syncStatus.status_message;
+        }
+      }
+    } catch (e) {}
+  }, 700);
+
+  try {
+    const res = await api('/api/sync', { method: 'POST' });
+    clearInterval(poller);
+
+    if (res.warning) {
+      showToast('⚠️ ' + res.warning, 'error');
+    } else {
+      const likedCount = res.liked_count || 0;
+      const plCount = res.playlists_count || 0;
+      const isEs = state.currentLang === 'es';
+      const msg = isEs 
+        ? `✅ ¡Sincronizadas ${likedCount} canciones y ${plCount} playlists!` 
+        : `✅ Synced ${likedCount} Liked Songs and ${plCount} playlists!`;
+      showToast(msg);
+    }
+    await checkStatus();
+    await loadTags();
+    await loadPlaylists();
+    await loadTracks();
+  } catch (e) {
+    clearInterval(poller);
+    showToast('Sync error: ' + e.message, 'error');
+  } finally {
+    isSyncInProgress = false;
+    hideSyncState();
+  }
+}
+
+// --- Background Auth Poller (for external browser login) ---
+let authPollerTimer = null;
+function startAuthPoller() {
+  if (authPollerTimer) return;
+  authPollerTimer = setInterval(async () => {
+    if (state.authenticated || state.isSyncing) return;
+    try {
+      const data = await api('/api/status');
+      if (data && data.authenticated) {
+        stopAuthPoller();
+        await checkStatus();
+        await loadTags();
+        await loadPlaylists();
+        await loadTracks();
+        triggerAutoSync();
+      }
+    } catch (e) {}
+  }, 2500);
+}
+
+function stopAuthPoller() {
+  if (authPollerTimer) {
+    clearInterval(authPollerTimer);
+    authPollerTimer = null;
+  }
 }
 
 // --- App Initialization ---
@@ -840,19 +984,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   try { initRightPanel(); } catch (e) { console.error('initRightPanel error:', e); }
   try { initPanelResizers(); } catch (e) { console.error('initPanelResizers error:', e); }
 
-  if (window.location.search.includes('auth=success')) {
+  const isAuthRedirect = window.location.search.includes('auth=success');
+  if (isAuthRedirect) {
     window.history.replaceState({}, document.title, window.location.pathname);
-    showToast('✅ Connected to Spotify! Syncing your library...');
-    try {
-      await api('/api/sync', { method: 'POST' });
-    } catch (e) {}
   }
 
-  try { await checkStatus(); } catch (e) {}
+  const statusData = await checkStatus();
   if (state.authenticated) {
     try { await loadTags(); } catch (e) {}
     try { await loadPlaylists(); } catch (e) {}
     try { await loadTracks(); } catch (e) {}
+    
+    // If just authorized or library has 0 synced tracks, automatically trigger sync!
+    if (isAuthRedirect || !statusData?.has_synced_tracks || (state.tracks.length === 0 && state.allPlaylists.length === 0)) {
+      triggerAutoSync();
+    }
   }
   try { startPlayerStatePoller(); } catch (e) {}
 });
@@ -936,6 +1082,7 @@ async function checkStatus() {
     const data = await api('/api/status');
     state.authenticated = data.authenticated;
     state.isMac = data.is_mac;
+    state.hasSyncedTracks = !!data.has_synced_tracks;
     
     if (DOM.remoteUrlDisplay) {
       DOM.remoteUrlDisplay.textContent = data.access_url;
@@ -943,25 +1090,34 @@ async function checkStatus() {
     
     if (data.authenticated) {
       DOM.connectionBadge.className = 'status-badge status-online';
-      DOM.statusText.textContent = 'Spotify Online';
+      DOM.statusText.textContent = t('connected') || 'Spotify Online';
       DOM.loginBtn?.classList.add('hidden');
       DOM.connectWelcomeHero?.classList.add('hidden');
-      DOM.tracksTable?.classList.remove('hidden');
+      if (!state.isSyncing) {
+        DOM.tracksTable?.classList.remove('hidden');
+      }
       loadDevices();
+      stopAuthPoller();
     } else {
       DOM.connectionBadge.className = 'status-badge status-offline';
-      DOM.statusText.textContent = 'Login Needed';
+      DOM.statusText.textContent = t('loginNeeded') || 'Login Needed';
       DOM.loginBtn?.classList.remove('hidden');
-      DOM.connectWelcomeHero?.classList.remove('hidden');
-      DOM.tracksTable?.classList.add('hidden');
-      DOM.emptyState?.classList.add('hidden');
+      if (!state.isSyncing) {
+        DOM.connectWelcomeHero?.classList.remove('hidden');
+        DOM.tracksTable?.classList.add('hidden');
+        DOM.emptyState?.classList.add('hidden');
+      }
       DOM.tracksTbody.innerHTML = '';
-      DOM.playlistsList.innerHTML = '<div style="padding:12px 16px; font-size:11px; color:#888;">Connect Spotify to load your playlists.</div>';
-      DOM.tagsList.innerHTML = '<div style="padding:12px 16px; font-size:11px; color:#888;">Connect Spotify to create tags.</div>';
+      DOM.playlistsList.innerHTML = `<div style="padding:12px 16px; font-size:11px; color:#888;">${t('connectPromptPlaylists') || 'Connect Spotify to load your playlists.'}</div>`;
+      DOM.tagsList.innerHTML = `<div style="padding:12px 16px; font-size:11px; color:#888;">${t('connectPromptTags') || 'Connect Spotify to create tags.'}</div>`;
+      startAuthPoller();
     }
+    return data;
   } catch (e) {
     DOM.connectionBadge.className = 'status-badge status-offline';
-    DOM.statusText.textContent = 'Offline';
+    DOM.statusText.textContent = t('offline') || 'Offline';
+    startAuthPoller();
+    return null;
   }
 }
 
@@ -1356,10 +1512,17 @@ function renderTracksTable() {
   DOM.tracksTbody.innerHTML = '';
   
   if (state.tracks.length === 0) {
-    DOM.emptyState.classList.remove('hidden');
+    if (state.authenticated && !state.isSyncing) {
+      DOM.connectWelcomeHero?.classList.add('hidden');
+      DOM.tracksTable?.classList.add('hidden');
+      DOM.emptyState?.classList.remove('hidden');
+    }
     return;
   } else {
-    DOM.emptyState.classList.add('hidden');
+    DOM.emptyState?.classList.add('hidden');
+    DOM.connectWelcomeHero?.classList.add('hidden');
+    DOM.syncLoadingHero?.classList.add('hidden');
+    DOM.tracksTable?.classList.remove('hidden');
   }
 
   const fragment = document.createDocumentFragment();
@@ -2494,28 +2657,6 @@ function initEventListeners() {
       method: 'POST',
       body: JSON.stringify({ volume_percent: parseInt(e.target.value, 10) })
     }).catch(() => {});
-  });
-
-  // Sync Library Button
-  DOM.syncBtn?.addEventListener('click', async () => {
-    DOM.syncBtn.disabled = true;
-    DOM.syncBtn.innerHTML = '<span>🔄</span> Syncing...';
-    try {
-      const res = await api('/api/sync', { method: 'POST' });
-      if (res.warning) {
-        showToast('⚠️ ' + res.warning, 'error');
-      } else {
-        showToast(`✅ Synced ${res.liked_count} Liked Songs and all playlists!`);
-      }
-      await loadTags();
-      await loadPlaylists();
-      await loadTracks();
-    } catch (e) {
-      showToast('Sync error: ' + e.message, 'error');
-    } finally {
-      DOM.syncBtn.disabled = false;
-      DOM.syncBtn.innerHTML = '<span>🔄</span> Sync Library';
-    }
   });
 
   // Modals

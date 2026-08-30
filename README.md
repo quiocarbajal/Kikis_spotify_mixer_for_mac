@@ -1,4 +1,4 @@
-# 🎵 Kiki's Spotify Mixer for Mac
+# <img src="Icon.jpeg" width="36" height="36" style="vertical-align: middle; border-radius: 8px;" alt="App Icon" /> Kiki's Spotify Mixer for Mac
 
 > **🤖 Built with AI**: This project was generated using AI, specifically **Google Antigravity**.
 
