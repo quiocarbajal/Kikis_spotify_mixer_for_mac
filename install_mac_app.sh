@@ -27,10 +27,14 @@ if [ -f "Icon.jpeg" ]; then
     cp Icon.jpeg frontend/icon.jpeg
 fi
 
-# 2. Compile Swift native launcher
-echo "🔨 Compiling native macOS launcher binary..."
+# 2. Compile Swift native launcher (if swiftc available, fallback to pre-compiled binary)
+echo "🔨 Preparing native macOS launcher binary..."
 mkdir -p mac_app
-swiftc mac_app/main.swift -o mac_app/kiki_spotify_launcher -framework Cocoa -framework WebKit
+if [ ! -f "mac_app/kiki_spotify_launcher" ]; then
+    swiftc mac_app/main.swift -o mac_app/kiki_spotify_launcher -framework Cocoa -framework WebKit
+else
+    swiftc mac_app/main.swift -o mac_app/kiki_spotify_launcher -framework Cocoa -framework WebKit 2>/dev/null || echo "Using existing compiled launcher binary."
+fi
 
 # 3. Create .app bundle
 APP_DIR="Kiki's Spotify Mixer.app"

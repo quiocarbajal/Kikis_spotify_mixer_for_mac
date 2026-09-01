@@ -38,6 +38,9 @@
             <span class="flag-icon">🇦🇷</span> <span class="lang-label">ES</span>
           </button>
         </div>
+        <button id="top-sync-btn" class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px; gap: 5px;" data-tooltip-title="Sync Spotify Library" data-tooltip="Download all your Liked Songs and playlists from Spotify to your local library.">
+          <span class="btn-icon">🔄</span> <span class="btn-text">Sync Library</span>
+        </button>
         <button id="login-btn" class="btn btn-primary hidden" data-tooltip-title="Spotify Login" data-tooltip="Connect your Spotify account to load playlists and control playback.">
           <span class="btn-icon">🟢</span> <span class="btn-text">Log in with Spotify</span>
         </button>
@@ -56,7 +59,12 @@
       <!-- Left Sidebar: Library, Tags, Playlists -->
       <aside id="sidebar">
         <div class="sidebar-section">
-          <div class="section-title">LIBRARY</div>
+          <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>LIBRARY</span>
+            <button id="sidebar-sync-btn" class="btn btn-ghost btn-sm" style="padding: 1px 6px; font-size: 10px;" data-tooltip-title="Sync Spotify Library" data-tooltip="Download all your Liked Songs and playlists from Spotify to your local library.">
+              🔄 Sync
+            </button>
+          </div>
           <ul class="nav-list">
             <li class="nav-item active" data-view="liked_songs" data-tooltip-title="Liked Songs" data-tooltip="All songs saved to your Spotify Liked Songs library.">
               <span class="nav-icon">💚</span>
@@ -125,25 +133,38 @@
       <main id="main-content">
         <!-- Main Toolbar with Active Queue Title and Information -->
         <div id="table-toolbar">
-          <div class="toolbar-left">
-            <div class="queue-heading-group">
-              <div class="queue-title-row">
-                <span class="queue-status-icon">🎧</span>
-                <span class="queue-main-title" id="active-queue-heading">Active Listening Queue</span>
-                <span class="queue-help-badge" data-tooltip-title="Active Listening Queue" data-tooltip="When you click ▶ Play List or press Space, Spotify plays these songs in the order they are shown below." data-tooltip-pos="bottom">ℹ️ Info</span>
+          <div class="toolbar-header-row">
+            <div class="toolbar-left">
+              <div class="queue-heading-group">
+                <div class="queue-title-row">
+                  <span class="queue-status-icon">🎧</span>
+                  <span class="queue-main-title" id="active-queue-heading">Active Listening Queue</span>
+                  <span class="queue-help-badge" data-tooltip-title="Active Listening Queue" data-tooltip="When you click ▶ Play List or press Space, Spotify plays these songs in the order they are shown below." data-tooltip-pos="bottom">ℹ️ Info</span>
+                </div>
+                <span class="queue-subtext" id="queue-subtext-desc">These are the songs you will hear when you hit play.</span>
               </div>
-              <span class="queue-subtext" id="queue-subtext-desc">These are the songs you will hear when you hit play.</span>
+              <div id="active-filter-chips" class="filter-chips-container"></div>
+              <span id="track-count-badge" class="count-indicator">Loading tracks...</span>
             </div>
-            <div id="active-filter-chips" class="filter-chips-container"></div>
-            <span id="track-count-badge" class="count-indicator">Loading tracks...</span>
+            <div class="toolbar-top-actions">
+              <button id="clear-queue-btn" class="btn btn-sm btn-ghost" data-tooltip-title="Clear Workspace" data-tooltip="Empties the active workspace list without deleting songs from your library. Undoable with Cmd+Z.">
+                🗑️ Clear
+              </button>
+            </div>
           </div>
 
-          <div class="toolbar-right">
+          <div class="toolbar-actions-row">
             <button id="play-active-list-btn" class="btn btn-sm btn-primary" data-tooltip-title="Play Active List" data-tooltip="Starts continuous playback from the first track in this active list.">
               ▶ Play List
             </button>
             <button id="shuffle-active-list-btn" class="btn btn-sm shuffle-toggle-btn" data-tooltip-title="Real Random Shuffle" data-tooltip="This is a real random shuffle. It generates a completely new random order every time you activate it.">
               🔀 True Shuffle
+            </button>
+            <button id="reload-view-btn" class="btn btn-sm btn-ghost" data-tooltip-title="Reload Original List" data-tooltip="Reload the clean, complete list from your library/playlist, resetting temporary workspace changes.">
+              🔄 Reload
+            </button>
+            <button id="save-as-playlist-btn" class="btn btn-sm btn-secondary" data-tooltip-title="Save as Playlist" data-tooltip="Save or overwrite a Spotify playlist with the songs currently in your workspace.">
+              💾 Save as Playlist
             </button>
             <button id="lock-order-btn" class="btn btn-sm btn-ghost" data-tooltip-title="Order Lock" data-tooltip="Toggle locking to prevent accidental drag reordering or shuffling.">
               🔓 Unlocked
@@ -242,10 +263,11 @@
 
       <!-- Right Panel: Dual Source Browser & Spotify Finder -->
       <aside id="right-panel">
-        <!-- Tab Selector: Search vs Browse Playlist -->
+        <!-- Tab Selector: Search vs Browse Playlist vs Surprise Me -->
         <div class="panel-tabs-bar">
-          <button id="tab-right-search" class="panel-tab-btn active" data-tooltip-title="Spotify Search" data-tooltip="Search and preview millions of tracks from Spotify's global catalog.">🔍 Spotify Search</button>
-          <button id="tab-right-playlist" class="panel-tab-btn" data-tooltip-title="Browse Playlists" data-tooltip="Browse tracks from your other Spotify playlists to drag into your queue.">📑 Browse 2nd List</button>
+          <button id="tab-right-search" class="panel-tab-btn active" data-tooltip-title="Spotify Search" data-tooltip="Search and preview millions of tracks from Spotify's global catalog.">🔍 Search</button>
+          <button id="tab-right-playlist" class="panel-tab-btn" data-tooltip-title="Browse Playlists" data-tooltip="Browse tracks from your other Spotify playlists to drag into your queue.">📑 Playlists</button>
+          <button id="tab-right-discovery" class="panel-tab-btn" data-tooltip-title="Surprise Me!" data-tooltip="Generate a smart discovery mix with multi-criteria AND/NOT seeds, strict negative exclusion filters, and true shuffle.">🎲 Surprise Me!</button>
         </div>
 
         <!-- Search Input Controls & Modifiers -->
@@ -270,22 +292,219 @@
           </select>
         </div>
 
-        <!-- Tag Filter Selector on Right Panel -->
-        <div class="right-tag-filter-bar">
+        <!-- Tag Filter Selector on Right Panel (for Search & Playlist tabs) -->
+        <div id="right-tag-filter-bar" class="right-tag-filter-bar">
           <select id="right-tag-picker" data-tooltip-title="Filter by Tag" data-tooltip="Filter right panel tracks by custom tags.">
             <option value="">🏷️ All Tags (Filter by Tag...)</option>
           </select>
         </div>
 
-        <!-- Action Header -->
-        <div class="right-action-header">
+        <!-- Discovery Studio Controls (Surprise Me! Tab) -->
+        <div id="right-discovery-controls" class="panel-subbar hidden">
+          <!-- Discovery Header Row -->
+          <div class="discovery-header-row">
+            <div class="discovery-title-group">
+              <span class="discovery-badge-icon">🎲</span>
+              <span class="discovery-title-text" id="discovery-panel-heading">Discovery Engine</span>
+            </div>
+            <button type="button" id="discovery-help-btn" class="discovery-help-btn" data-tooltip-title="Discovery Engine Guide" data-tooltip="Combine artists, genres, decades and tracks with [+ AND] (include) and [- NOT] (exclude) modifiers. Strict filters guarantee you won't hear songs already in your Liked Songs or Playlists." data-tooltip-pos="bottom">ℹ️ Help</button>
+          </div>
+
+          <!-- Section 1: Artists (AND / NOT) -->
+          <div class="discovery-field-group">
+            <div class="discovery-field-label-row">
+              <span class="discovery-field-label">🎤 Artists (AND / NOT):</span>
+            </div>
+            <div class="discovery-input-row">
+              <button type="button" id="disc-artist-mod-btn" class="mod-toggle-btn mod-and" data-tooltip-title="Modifier Toggle" data-tooltip="Toggle between [+ AND] (include artists) and [- NOT] (exclude artists).">[+ AND]</button>
+              <div class="typeahead-wrap">
+                <input type="text" id="discovery-artist-input" placeholder="Type artist name (e.g. Daft Punk)..." autocomplete="off" data-tooltip-title="Artist Typeahead" data-tooltip="Type artist name to view live suggestions with photos, then click to add as [+ AND] or [- NOT].">
+                <div id="discovery-artist-suggestions" class="typeahead-dropdown hidden"></div>
+              </div>
+              <button type="button" id="discovery-add-artist-btn" class="btn btn-sm btn-secondary" data-tooltip-title="Add Artist" data-tooltip="Add this artist to the active query filter.">+</button>
+            </div>
+            <div id="discovery-artist-chips" class="discovery-chips-container"></div>
+          </div>
+
+          <!-- Section 2: Genres (AND / NOT) & Quick-Pill Cloud -->
+          <div class="discovery-field-group">
+            <div class="discovery-field-label-row">
+              <span class="discovery-field-label">🎸 Genres (AND / NOT):</span>
+            </div>
+            <div class="discovery-input-row">
+              <button type="button" id="disc-genre-mod-btn" class="mod-toggle-btn mod-and" data-tooltip-title="Modifier Toggle" data-tooltip="Toggle between [+ AND] (include genre) and [- NOT] (exclude genre).">[+ AND]</button>
+              <div class="typeahead-wrap">
+                <input type="text" id="discovery-genre-input" placeholder="Search genres (e.g. indie, synth-pop)..." autocomplete="off" data-tooltip-title="Genre Autocomplete" data-tooltip="Search over 120+ official Spotify genres as you type.">
+                <div id="discovery-genre-suggestions" class="typeahead-dropdown hidden"></div>
+              </div>
+              <button type="button" id="discovery-add-genre-btn" class="btn btn-sm btn-secondary" data-tooltip-title="Add Genre" data-tooltip="Add this genre to the query filter.">+</button>
+            </div>
+            <!-- Genre Category Tabs -->
+            <div class="genre-category-subrow">
+              <span class="genre-cat-label-hint" id="genre-cat-hint-label">📂 Category Tabs (switches genre pills below):</span>
+            </div>
+            <div class="genre-category-bar" data-tooltip-title="Genre Category Tabs" data-tooltip="Click any category tab (Popular, Rock/Indie, Electronic, Latin, etc.) to load its specific 3-state genre pills in the cloud below.">
+              <span class="genre-cat-pill active" data-cat="Popular" data-category="Popular">Popular</span>
+              <span class="genre-cat-pill" data-cat="Rock & Indie" data-category="Rock & Indie">Rock/Indie</span>
+              <span class="genre-cat-pill" data-cat="Electronic & Dance" data-category="Electronic & Dance">Electronic</span>
+              <span class="genre-cat-pill" data-cat="Latin & World" data-category="Latin & World">Latin</span>
+              <span class="genre-cat-pill" data-cat="Chill & Acoustic" data-category="Chill & Acoustic">Chill</span>
+              <span class="genre-cat-pill" data-cat="Hip-Hop & R&B" data-category="Hip-Hop & R&B">Hip-Hop</span>
+              <span class="genre-cat-pill" data-cat="Metal & Hard" data-category="Metal & Hard">Metal</span>
+              <span class="genre-cat-pill" data-cat="Jazz & Classical" data-category="Jazz & Classical">Jazz</span>
+            </div>
+            <!-- 3-State Genre Quick Pills -->
+            <div id="discovery-genre-pills" class="discovery-pills-cloud" data-tooltip-title="3-State Genre Pills" data-tooltip="Click once to [+ AND] (Include), click again to [- NOT] (Exclude), click third time to turn Off."></div>
+            <div id="discovery-genre-chips" class="discovery-chips-container"></div>
+          </div>
+
+          <!-- Section 3: Decades (AND / NOT) -->
+          <div class="discovery-field-group">
+            <div class="discovery-field-label-row">
+              <span class="discovery-field-label">📅 Decades (AND / NOT):</span>
+            </div>
+            <div id="discovery-decade-pills" class="decade-pills-grid" data-tooltip-title="3-State Decade Pills" data-tooltip="Click once for [+ AND] (Include), click again for [- NOT] (Exclude), click again for Off.">
+              <button type="button" class="tri-state-pill" data-decade="60s">60s</button>
+              <button type="button" class="tri-state-pill" data-decade="70s">70s</button>
+              <button type="button" class="tri-state-pill" data-decade="80s">80s</button>
+              <button type="button" class="tri-state-pill" data-decade="90s">90s</button>
+              <button type="button" class="tri-state-pill" data-decade="00s">00s</button>
+              <button type="button" class="tri-state-pill" data-decade="10s">10s</button>
+              <button type="button" class="tri-state-pill" data-decade="20s">20s</button>
+              <button type="button" class="tri-state-pill" data-decade="fresh">Fresh</button>
+            </div>
+          </div>
+
+          <!-- Section 4: Song Seed & Active Vibe -->
+          <div class="discovery-field-group">
+            <div class="discovery-field-label-row">
+              <span class="discovery-field-label">🎵 Song Seed & Queue Vibe:</span>
+            </div>
+            <div class="discovery-input-row">
+              <button type="button" id="disc-track-mod-btn" class="mod-toggle-btn mod-and" data-tooltip-title="Modifier Toggle" data-tooltip="Toggle between [+ AND] (similar to song) and [- NOT] (dissimilar).">[+ AND]</button>
+              <div class="typeahead-wrap">
+                <input type="text" id="discovery-track-input" placeholder="Type song title (e.g. Get Lucky)..." autocomplete="off" data-tooltip-title="Song Seed Autocomplete" data-tooltip="Type song title to find exact Spotify tracks as recommendation seeds.">
+                <div id="discovery-track-suggestions" class="typeahead-dropdown hidden"></div>
+              </div>
+            </div>
+            <div id="discovery-track-chips" class="discovery-chips-container"></div>
+            <button type="button" id="discovery-active-vibe-btn" class="btn btn-sm btn-ghost vibe-blend-btn" data-tooltip-title="Active Queue Vibe" data-tooltip="Analyzes the top artists and genres from your currently loaded main listening queue and blends them into this discovery mix.">
+              🔮 Blend Active Queue Vibe
+            </button>
+          </div>
+
+          <!-- Section 5: Strict Negative Exclusions -->
+          <div class="discovery-exclusions-card">
+            <div class="exclusions-card-title">🚫 STRICT EXCLUSION FILTERS</div>
+            <label class="switch-row" data-tooltip-title="NOT in Liked Songs" data-tooltip="Guarantees 100% brand new music by excluding every song in your Liked Songs library.">
+              <input type="checkbox" id="disc-not-liked" checked>
+              <span class="switch-label">NOT in Liked Songs (Genuinely New)</span>
+            </label>
+            <label class="switch-row" data-tooltip-title="NOT in Any Playlist" data-tooltip="Excludes any song that is already saved in any of your Spotify playlists.">
+              <input type="checkbox" id="disc-not-playlists" checked>
+              <span class="switch-label">NOT in Any of My Playlists</span>
+            </label>
+            <!-- NOT Recently Played with dedicated top title -->
+            <div class="discovery-sub-block" data-tooltip-title="NOT Recently Played Filter" data-tooltip="Excludes songs played within the last 7 or 30 days.">
+              <div class="discovery-sub-label" id="disc-recent-title">🕒 NOT Recently Played:</div>
+              <div class="radio-pill-group recent-pill-group">
+                <label class="radio-pill">
+                  <input type="radio" name="disc-recent-days" value="0">
+                  <span id="disc-recent-off-label">Off</span>
+                </label>
+                <label class="radio-pill">
+                  <input type="radio" name="disc-recent-days" value="7">
+                  <span id="disc-recent-7d-label">Past 7 Days</span>
+                </label>
+                <label class="radio-pill">
+                  <input type="radio" name="disc-recent-days" value="30" checked>
+                  <span id="disc-recent-30d-label">Past 30 Days</span>
+                </label>
+              </div>
+            </div>
+            <div class="switches-dual-row">
+              <label class="switch-row" data-tooltip-title="NOT Live" data-tooltip="Filters out concert recordings, live albums, and en vivo tracks.">
+                <input type="checkbox" id="disc-not-live" checked>
+                <span class="switch-label">NOT Live</span>
+              </label>
+              <label class="switch-row" data-tooltip-title="NOT Remix" data-tooltip="Filters out club edits, remixes, VIP mixes, and dub edits.">
+                <input type="checkbox" id="disc-not-remix" checked>
+                <span class="switch-label">NOT Remix</span>
+              </label>
+            </div>
+            <label class="switch-row" style="margin-top: 3px;" data-tooltip-title="Low Popularity Only (Hidden Gems)" data-tooltip="Discovers exclusively underground, obscure gems and indie artists rather than mainstream hits.">
+              <input type="checkbox" id="disc-low-popularity">
+              <span class="switch-label" id="disc-low-pop-label">💎 Low Popularity Only (Hidden Gems)</span>
+            </label>
+            <div id="hidden-gem-target-wrap" class="hidden-gem-target-wrap hidden" style="margin-left: 20px; margin-top: 4px; display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 10px; color: var(--text-muted); font-weight: 600;" id="hidden-gem-scope-label">Gem Target:</span>
+              <div class="radio-pill-group" style="max-width: 220px;">
+                <label class="radio-pill"><input type="radio" name="disc-hidden-gem-target" value="artist" checked><span id="gem-target-artist-label">👤 Artist</span></label>
+                <label class="radio-pill"><input type="radio" name="disc-hidden-gem-target" value="track"><span id="gem-target-track-label">🎵 Song</span></label>
+                <label class="radio-pill"><input type="radio" name="disc-hidden-gem-target" value="both"><span id="gem-target-both-label">🌟 Both</span></label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 6: Queue Target & Generate Button -->
+          <div class="discovery-generate-card">
+            <div class="queue-size-row" data-tooltip-title="Queue Target Size" data-tooltip="Choose how many discovered tracks to generate (30 to 100).">
+              <span class="queue-size-label">Target Tracks:</span>
+              <div class="radio-pill-group queue-size-group">
+                <label class="radio-pill"><input type="radio" name="disc-target-count" value="30" checked><span>30</span></label>
+                <label class="radio-pill"><input type="radio" name="disc-target-count" value="50"><span>50</span></label>
+                <label class="radio-pill"><input type="radio" name="disc-target-count" value="75"><span>75</span></label>
+                <label class="radio-pill"><input type="radio" name="disc-target-count" value="100"><span>100</span></label>
+              </div>
+            </div>
+            <label class="switch-row" style="margin-top: 4px;" data-tooltip-title="True Shuffle" data-tooltip="Applies cryptographic Fisher-Yates shuffle with anti-clumping so no consecutive songs from the same artist occur.">
+              <input type="checkbox" id="disc-true-shuffle" checked>
+              <span class="switch-label">🔀 True Shuffle + Anti-Clumping</span>
+            </label>
+            <button type="button" id="discovery-generate-btn" class="btn btn-primary btn-generate-discovery" data-tooltip-title="Generate Discovery Mix" data-tooltip="Runs the multi-strategy seed harvester and strict negative filter pipeline.">
+              <span class="dice-icon">🎲</span> <span class="btn-text">Generate Discovery Mix</span>
+            </button>
+          </div>
+
+          <!-- Section 7: Discovered Results (Appears below options with auto-scroll) -->
+          <div id="discovery-results-section" class="discovery-results-section hidden">
+            <div class="discovery-action-top-row">
+              <span id="discovery-result-count-badge" class="discovery-result-count">0 discovered</span>
+              <div style="display: flex; gap: 4px;">
+                <button type="button" id="disc-play-direct-btn" class="btn btn-sm btn-primary" data-tooltip-title="Play Discovery Mix" data-tooltip="Plays all discovered tracks directly in Spotify without modifying your main workspace queue.">
+                  ▶ Play Mix
+                </button>
+                <button type="button" id="disc-select-all-btn" class="btn btn-sm btn-ghost" data-tooltip-title="Select All" data-tooltip="Toggle selecting all discovered tracks.">Select All</button>
+              </div>
+            </div>
+            <div class="discovery-action-buttons-grid">
+              <button type="button" id="disc-replace-queue-btn" class="btn btn-sm btn-accent" data-tooltip-title="Replace Main Queue" data-tooltip="Clears all songs currently in your active listening queue and loads all newly discovered tracks.">
+                🔄 Replace Main Queue
+              </button>
+              <button type="button" id="disc-replace-play-btn" class="btn btn-sm btn-secondary" data-tooltip-title="Replace & Play Immediately" data-tooltip="Clears current main queue, loads discovered tracks, and starts playback instantly with True Shuffle.">
+                ▶ Replace & Play
+              </button>
+              <button type="button" id="disc-append-queue-btn" class="btn btn-sm btn-secondary" data-tooltip-title="Append to Main Queue" data-tooltip="Adds all discovered tracks to the bottom of the main queue without removing existing songs.">
+                ➕ Append All
+              </button>
+              <button type="button" id="disc-append-selected-btn" class="btn btn-sm btn-ghost" data-tooltip-title="Append Selected Tracks" data-tooltip="Adds only the checked tracks to the bottom of the main queue.">
+                ➕ Append Selected
+              </button>
+            </div>
+            <!-- Discovery Discovered Tracks List -->
+            <div id="discovery-items-container" class="discovery-items-container"></div>
+          </div>
+        </div>
+
+        <!-- Action Header for Standard Search / Playlists -->
+        <div id="right-standard-action-header" class="right-action-header">
           <span id="right-selected-text" class="right-selected-count">0 selected</span>
           <button id="right-add-selected-btn" class="btn btn-sm btn-primary" data-tooltip-title="Add to Main List" data-tooltip="Append selected songs from the right panel directly into your active list.">
             ➕ Add to Main List
           </button>
         </div>
 
-        <!-- Selectable & Draggable Items List -->
+        <!-- Selectable & Draggable Items List (Search / Playlists) -->
         <div id="right-items-container" class="right-items-container">
           <div class="search-placeholder-text">Type above to search Spotify or choose a playlist to browse songs.</div>
         </div>
@@ -334,8 +553,10 @@
     <div class="context-item" id="ctx-make-playlist">➕ Make Spotify Playlist...</div>
     <div class="context-divider"></div>
     <div class="context-item" id="ctx-assign-tags">🏷️ Assign Tags...</div>
-    <div class="context-divider"></div>
     <div class="context-item danger" id="ctx-remove-tags">❌ Remove Tags</div>
+    <div class="context-divider"></div>
+    <div class="context-item danger" id="ctx-remove-from-list">🗑️ Remove Selected from List</div>
+    <div class="context-item" id="ctx-keep-only-selected">🎯 Keep Only Selected (Remove Others)</div>
   </div>
 
   <!-- Custom Right-Click Context Menu for Tags in Left Sidebar -->

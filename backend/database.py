@@ -6,16 +6,15 @@ def get_user_data_dir() -> str:
     app_data = os.getenv("APP_DATA_DIR")
     if app_data and os.path.isdir(app_data):
         return app_data
-    local_db = os.path.join(os.path.dirname(__file__), "..", "spotify_tags.db")
-    if os.path.exists(local_db) and os.access(os.path.dirname(local_db), os.W_OK):
-        return os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     
     app_support = os.path.expanduser("~/Library/Application Support/KikisSpotifyMixer")
     try:
         os.makedirs(app_support, exist_ok=True)
         return app_support
     except Exception:
-        return "."
+        pass
+        
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 DATA_DIR = get_user_data_dir()
 DB_PATH = os.getenv("DATABASE_PATH", os.path.join(DATA_DIR, "spotify_tags.db"))
@@ -99,19 +98,27 @@ def init_db():
     );
     """)
     
+    # Playback History table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS playback_history (
+        track_id TEXT NOT NULL,
+        played_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (track_id, played_at)
+    );
+    """)
+
     # Insert default sample tags if none exist
     cursor.execute("SELECT COUNT(*) FROM tags;")
     if cursor.fetchone()[0] == 0:
         default_tags = [
-            ("Focus", "#3b82f6"),
-            ("Workout", "#ef4444"),
-            ("Chill", "#10b981"),
-            ("Acoustic", "#f59e0b"),
-            ("LateNight", "#8b5cf6"),
-            ("Favorites", "#ec4899"),
-            ("80s/90s", "#06b6d4"),
+            ("cuarteto", "#f59e0b", 0),
+            ("cumbiaVillera", "#10b981", 1),
+            ("ejercicio", "#ef4444", 2),
+            ("rockNacionalArgentino", "#3b82f6", 3),
+            ("chacarera", "#8b5cf6", 4),
+            ("tango", "#ec4899", 5),
         ]
-        cursor.executemany("INSERT OR IGNORE INTO tags (name, color) VALUES (?, ?);", default_tags)
+        cursor.executemany("INSERT OR IGNORE INTO tags (name, color, order_index) VALUES (?, ?, ?);", default_tags)
         
     conn.commit()
     conn.close()
@@ -503,6 +510,143 @@ def get_playlists() -> List[Dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM playlists ORDER BY is_custom DESC, name ASC;")
+    playlists = [dict(r) for r in cursor.fetchall()]
+    
+    cursor.execute("SELECT playlist_id, track_id FROM playlist_tracks ORDER BY playlist_id, order_index ASC;")
+    rows = cursor.fetchall()
+    conn.close()
+    
+    mapping = {}
+    for r in rows:
+        pid = r["playlist_id"]
+        if pid not in mapping:
+            mapping[pid] = []
+        mapping[pid].append(r["track_id"])
+        
+    for p in playlists:
+        p["track_ids"] = mapping.get(p["id"], [])
+        
+    return playlists
+
+# --- Playback History & Discovery Query Helpers ---
+
+def record_playback(track_id: str):
+    if not track_id:
+        return
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    INSERT OR REPLACE INTO playback_history (track_id, played_at)
+    VALUES (?, CURRENT_TIMESTAMP);
+    """, (track_id,))
+    conn.commit()
+    conn.close()
+
+def get_recently_played_ids(days: int = 7) -> List[str]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    SELECT DISTINCT track_id FROM playback_history
+    WHERE played_at >= datetime('now', '-' || ? || ' days');
+    """, (days,))
+    rows = cursor.fetchall()
+    conn.close()
+    return [r[0] for r in rows if r[0]]
+
+def get_recently_played_identities(days: int = 7) -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    SELECT DISTINCT t.id, t.title, t.artist FROM playback_history ph
+    JOIN tracks t ON ph.track_id = t.id
+    WHERE ph.played_at >= datetime('now', '-' || ? || ' days');
+    """, (days,))
     rows = cursor.fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+def get_all_user_saved_track_ids() -> List[str]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    SELECT DISTINCT track_id FROM playlist_tracks
+    WHERE playlist_id = 'liked_songs';
+    """)
+    rows = cursor.fetchall()
+    conn.close()
+    return [r[0] for r in rows if r[0]]
+
+def get_all_user_saved_track_identities() -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    SELECT DISTINCT t.id, t.title, t.artist FROM tracks t
+    JOIN playlist_tracks pt ON t.id = pt.track_id
+    WHERE pt.playlist_id = 'liked_songs';
+    """)
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def get_all_playlist_track_ids() -> List[str]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT track_id FROM playlist_tracks;")
+    rows = cursor.fetchall()
+    conn.close()
+    return [r[0] for r in rows if r[0]]
+
+def get_all_playlist_track_identities() -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT t.id, t.title, t.artist FROM tracks t JOIN playlist_tracks pt ON t.id = pt.track_id;")
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def get_active_playlist_vibe_seeds(playlist_id: Optional[str] = None) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    if playlist_id:
+        cursor.execute("""
+        SELECT t.id, t.artist, t.title, t.album
+        FROM tracks t
+        JOIN playlist_tracks pt ON t.id = pt.track_id
+        WHERE pt.playlist_id = ?
+        ORDER BY pt.order_index ASC
+        LIMIT 50;
+        """, (playlist_id,))
+    else:
+        cursor.execute("""
+        SELECT t.id, t.artist, t.title, t.album
+        FROM tracks t
+        JOIN playlist_tracks pt ON t.id = pt.track_id
+        ORDER BY pt.order_index ASC
+        LIMIT 50;
+        """)
+        
+    rows = cursor.fetchall()
+    conn.close()
+    
+    tracks = [dict(r) for r in rows]
+    artist_counts: Dict[str, int] = {}
+    for t in tracks:
+        art = t.get("artist", "")
+        for single_art in art.split(","):
+            clean_art = single_art.strip()
+            if clean_art:
+                artist_counts[clean_art] = artist_counts.get(clean_art, 0) + 1
+                
+    top_artists = sorted(artist_counts.keys(), key=lambda a: artist_counts[a], reverse=True)[:5]
+    sample_tracks = [{"id": t["id"], "title": t.get("title", ""), "artist": t.get("artist", "")} for t in tracks[:10]]
+    active_queue_identities = [{"title": t.get("title", ""), "artist": t.get("artist", "")} for t in tracks]
+    
+    return {
+        "top_artists": top_artists,
+        "sample_tracks": sample_tracks,
+        "sample_track_ids": [t["id"] for t in tracks[:10]],
+        "active_queue_identities": active_queue_identities,
+        "total_analyzed": len(tracks)
+    }
+

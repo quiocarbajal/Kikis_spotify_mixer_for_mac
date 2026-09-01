@@ -67,6 +67,8 @@ class CreatePlaylistRequest(BaseModel):
     name: str
     description: Optional[str] = ""
     track_ids: List[str]
+    overwrite: Optional[bool] = False
+    playlist_id: Optional[str] = None
 
 class PlaylistRenameRequest(BaseModel):
     new_name: str
@@ -94,6 +96,30 @@ class SeekRequest(BaseModel):
 
 class ExportTagRequest(BaseModel):
     tag_name: str
+
+class BooleanTerm(BaseModel):
+    value: str
+    id: Optional[str] = None
+    modifier: str = "AND"  # "AND" or "NOT"
+
+class DiscoveryMatrixRequest(BaseModel):
+    artists: Optional[List[BooleanTerm]] = []
+    tracks: Optional[List[BooleanTerm]] = []
+    genres: Optional[List[BooleanTerm]] = []
+    decades: Optional[List[BooleanTerm]] = []
+    keywords: Optional[List[BooleanTerm]] = []
+    use_active_vibe: Optional[bool] = False
+    active_playlist_id: Optional[str] = None
+    not_liked_songs: Optional[bool] = True
+    not_in_playlists: Optional[bool] = True
+    not_recently_played_days: Optional[int] = 30
+    not_live: Optional[bool] = False
+    not_remix: Optional[bool] = False
+    low_popularity_only: Optional[bool] = False
+    hidden_gem_target: Optional[str] = "artist"
+    target_count: Optional[int] = 30
+    true_shuffle: Optional[bool] = True
+    avoid_consecutive_artists: Optional[bool] = True
 
 # --- API Endpoints ---
 
@@ -365,6 +391,35 @@ def create_playlist(req: CreatePlaylistRequest):
     if not req.name.strip():
         raise HTTPException(status_code=400, detail="Playlist name is required")
         
+    tracks = db.get_tracks_query()
+    track_map = {t["id"]: t for t in tracks}
+    uris = [track_map[t_id]["uri"] if t_id in track_map else f"spotify:track:{t_id}" for t_id in req.track_ids]
+
+    # Check for overwrite
+    p_id = req.playlist_id
+    if not p_id and req.overwrite:
+        existing_p = next((p for p in db.get_all_playlists() if p["name"].strip().lower() == req.name.strip().lower()), None)
+        if existing_p:
+            p_id = existing_p["id"]
+
+    if req.overwrite and p_id:
+        # 1. Update database playlist tracks and total count
+        db.set_playlist_tracks(p_id, req.track_ids)
+        db.rename_playlist(p_id, req.name.strip())
+        
+        # 2. Overwrite on Spotify if authenticated and not a local-only custom ID
+        if sp_client.is_authenticated() and not p_id.startswith("custom_") and p_id != "liked_songs":
+            try:
+                sp_client.overwrite_user_playlist(p_id, uris)
+                sp = sp_client.get_spotify_client()
+                if sp and req.description:
+                    sp.playlist_change_details(p_id, description=req.description)
+            except Exception as e:
+                print(f"Spotify overwrite playlist error: {e}")
+                
+        return {"success": True, "overwritten": True, "playlist_id": p_id, "name": req.name.strip(), "total_tracks": len(req.track_ids)}
+
+    # Brand new playlist
     p_id = f"custom_{int(time.time())}_{uuid.uuid4().hex[:6]}"
     
     # 1. Save locally in database immediately
@@ -382,9 +437,6 @@ def create_playlist(req: CreatePlaylistRequest):
     spotify_playlist_id = None
     if sp_client.is_authenticated():
         try:
-            tracks = db.get_tracks_query()
-            track_map = {t["id"]: t for t in tracks}
-            uris = [track_map[t_id]["uri"] if t_id in track_map else f"spotify:track:{t_id}" for t_id in req.track_ids]
             res = sp_client.create_user_playlist(req.name, req.description or "", uris)
             if res and isinstance(res, dict) and res.get("success"):
                 spotify_playlist_id = res.get("playlist_id")
@@ -476,6 +528,101 @@ def export_tag(req: ExportTagRequest):
     res = sp_client.export_tag_to_playlist(req.tag_name, uris)
     return res
 
+# --- "🎲 Surprise Me!" Discovery Endpoints ---
+
+@app.get("/api/discovery/genres")
+def get_discovery_genres(category: Optional[str] = None, q: Optional[str] = None):
+    genres = sp_client.search_genres(query=q or "", category=category)
+    return {"genres": genres, "count": len(genres)}
+
+@app.get("/api/discovery/decades")
+def get_discovery_decades():
+    decades = [
+        {"id": "60s", "name": "60s (1960–1969)"},
+        {"id": "70s", "name": "70s (1970–1979)"},
+        {"id": "80s", "name": "80s (1980–1989)"},
+        {"id": "90s", "name": "90s (1990–1999)"},
+        {"id": "00s", "name": "2000s (2000–2009)"},
+        {"id": "10s", "name": "2010s (2010–2019)"},
+        {"id": "20s", "name": "2020s (2020–2029)"},
+        {"id": "fresh", "name": "Fresh / New (2024–2026)"}
+    ]
+    return {"decades": decades}
+
+@app.get("/api/discovery/suggest")
+def get_discovery_suggestions(q: str = Query(..., min_length=1), type: str = "artist", limit: int = 6):
+    type_clean = type.lower().strip()
+    if type_clean == "artist":
+        results = sp_client.suggest_artists(q, limit=limit)
+    elif type_clean == "track":
+        results = sp_client.suggest_tracks(q, limit=limit)
+    elif type_clean == "genre":
+        results = sp_client.search_genres(query=q)
+    else:
+        results = []
+    return {"results": results, "suggestions": results, "count": len(results)}
+
+@app.get("/api/discovery/active-vibe")
+def get_active_vibe(playlist_id: Optional[str] = None):
+    vibe = db.get_active_playlist_vibe_seeds(playlist_id=playlist_id)
+    return {"vibe": vibe}
+
+@app.post("/api/discovery/generate")
+def generate_discovery_mix(req: DiscoveryMatrixRequest):
+    # 1. Fetch exclusion sets and canonical identities from local DB
+    liked_ids_set = set(db.get_all_user_saved_track_ids()) if req.not_liked_songs else set()
+    liked_identities_list = db.get_all_user_saved_track_identities() if req.not_liked_songs else []
+
+    playlist_ids_set = set(db.get_all_playlist_track_ids()) if req.not_in_playlists else set()
+    playlist_identities_list = db.get_all_playlist_track_identities() if req.not_in_playlists else []
+
+    recent_ids_set = set(db.get_recently_played_ids(days=req.not_recently_played_days or 7)) if req.not_recently_played_days else set()
+    recent_identities_list = db.get_recently_played_identities(days=req.not_recently_played_days or 7) if req.not_recently_played_days else []
+    
+    active_vibe_seeds = None
+    if req.use_active_vibe:
+        active_vibe_seeds = db.get_active_playlist_vibe_seeds(playlist_id=req.active_playlist_id)
+
+    # Convert Pydantic models to dicts
+    artists_list = [term.model_dump() for term in (req.artists or [])]
+    tracks_list = [term.model_dump() for term in (req.tracks or [])]
+    genres_list = [term.model_dump() for term in (req.genres or [])]
+    decades_list = [term.model_dump() for term in (req.decades or [])]
+    keywords_list = [term.model_dump() for term in (req.keywords or [])]
+
+    # 2. Run boolean matrix discovery engine
+    result = sp_client.discover_boolean_matrix(
+        artists=artists_list,
+        tracks=tracks_list,
+        genres=genres_list,
+        decades=decades_list,
+        keywords=keywords_list,
+        use_active_vibe=bool(req.use_active_vibe),
+        active_vibe_seeds=active_vibe_seeds,
+        not_liked_songs=bool(req.not_liked_songs),
+        not_in_playlists=bool(req.not_in_playlists),
+        not_recently_played_days=req.not_recently_played_days,
+        not_live=bool(req.not_live),
+        not_remix=bool(req.not_remix),
+        low_popularity_only=bool(req.low_popularity_only),
+        hidden_gem_target=req.hidden_gem_target or "artist",
+        target_count=req.target_count or 30,
+        true_shuffle=bool(req.true_shuffle),
+        avoid_consecutive_artists=bool(req.avoid_consecutive_artists),
+        liked_ids_set=liked_ids_set,
+        playlist_ids_set=playlist_ids_set,
+        recent_ids_set=recent_ids_set,
+        liked_identities_list=liked_identities_list,
+        playlist_identities_list=playlist_identities_list,
+        recent_identities_list=recent_identities_list
+    )
+
+    # 3. Upsert discovered tracks to DB tracks table
+    if result.get("tracks"):
+        db.upsert_tracks(result["tracks"])
+
+    return result
+
 # --- Playback & True Random Controller ---
 
 @app.post("/api/player/play")
@@ -484,6 +631,12 @@ def play_track_selection(req: PlayRequest):
     if not uris:
         raise HTTPException(status_code=400, detail="No track URIs provided")
         
+    # Record playback history for all played tracks
+    for uri in uris:
+        if "spotify:track:" in uri:
+            t_id = uri.split(":")[-1]
+            db.record_playback(t_id)
+
     if req.true_shuffle:
         artist_map = {}
         if req.avoid_consecutive_artists:
@@ -586,11 +739,15 @@ def get_player_state():
     if sys.platform == "darwin" and apple_ctrl.is_spotify_running():
         apple_state = apple_ctrl.get_current_status()
         if apple_state and apple_state.get("is_playing"):
+            if apple_state.get("item") and apple_state["item"].get("id"):
+                db.record_playback(apple_state["item"]["id"])
             return apple_state
             
     if sp_client.is_authenticated():
         state = sp_client.get_current_playback_state()
         if state:
+            if state.get("is_playing") and state.get("item") and state["item"].get("id"):
+                db.record_playback(state["item"]["id"])
             return state
             
     if sys.platform == "darwin":
