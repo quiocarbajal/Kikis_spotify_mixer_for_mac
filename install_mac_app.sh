@@ -94,11 +94,14 @@ EOF
 
 # 4. Install to User's Applications folder (No admin rights required)
 USER_APPS="$HOME/Applications"
-mkdir -p "$USER_APPS"
+mkdir -p "$USER_APPS" 2>/dev/null || true
 
 echo "📦 Installing to $USER_APPS/Kiki's Spotify Mixer.app..."
-rm -rf "$USER_APPS/$APP_DIR"
-cp -R "$APP_DIR" "$USER_APPS/$APP_DIR"
+if [ -d "$USER_APPS" ] && [ -w "$USER_APPS" ]; then
+    rm -rf "$USER_APPS/$APP_DIR" 2>/dev/null || true
+    cp -R "$APP_DIR" "$USER_APPS/$APP_DIR" 2>/dev/null || true
+    echo "✅ Installed into $USER_APPS/$APP_DIR"
+fi
 
 # Also update /Applications if writable
 if [ -w "/Applications" ]; then
@@ -106,8 +109,5 @@ if [ -w "/Applications" ]; then
     cp -R "$APP_DIR" "/Applications/$APP_DIR" 2>/dev/null || true
 fi
 
-# Clean up local build directory copy
-rm -rf "$APP_DIR"
-
-echo "✅ Done! Installed successfully into $USER_APPS/Kiki's Spotify Mixer.app"
-echo "🚀 You can now launch 'Kiki'\''s Spotify Mixer' from Spotlight (Cmd+Space), Launchpad, or ~/Applications."
+echo "✅ App bundle ready: $DIR/$APP_DIR"
+echo "🚀 You can now launch 'Kiki'\''s Spotify Mixer' directly or run ./build_dmg.sh."

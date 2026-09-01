@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -76,41 +76,7 @@
               <span class="nav-label">All Tracks</span>
               <span class="nav-count" id="count-all">0</span>
             </li>
-            <li class="nav-item" data-view="untagged" data-tooltip-title="Untagged Songs" data-tooltip="Songs without any assigned custom tags. Perfect for organizing!">
-              <span class="nav-icon">⭐</span>
-              <span class="nav-label">Untagged Songs</span>
-              <span class="nav-count" id="count-untagged">0</span>
-            </li>
           </ul>
-        </div>
-
-        <div class="sidebar-section">
-          <div class="section-header-flex">
-            <div class="section-title">CUSTOM TAGS</div>
-            <button id="create-tag-sidebar-btn" class="icon-btn-small" data-tooltip-title="New Custom Tag" data-tooltip="Create a new color-coded tag to label and filter songs.">+</button>
-          </div>
-
-          <!-- Boolean Filter Mode Selector -->
-          <div class="filter-mode-selector">
-            <span class="filter-mode-label">Tag Filter Mode:</span>
-            <div class="radio-pill-group">
-              <label class="radio-pill" data-tooltip-title="AND Mode" data-tooltip="Show only songs that contain ALL active selected tags.">
-                <input type="radio" name="filter-mode" value="AND" checked>
-                <span>AND</span>
-              </label>
-              <label class="radio-pill" data-tooltip-title="OR Mode" data-tooltip="Show songs that contain ANY of the active selected tags.">
-                <input type="radio" name="filter-mode" value="OR">
-                <span>OR</span>
-              </label>
-              <label class="radio-pill" data-tooltip-title="NOT Mode" data-tooltip="Exclude songs that have any of the active selected tags.">
-                <input type="radio" name="filter-mode" value="NOT">
-                <span>NOT</span>
-              </label>
-            </div>
-          </div>
-
-          <div id="tags-dropzone-tip" class="drag-hint">💡 Drag tags onto songs (or songs onto tags) to label</div>
-          <div id="tags-list" class="tags-container"></div>
         </div>
 
         <div class="sidebar-section">
@@ -143,7 +109,6 @@
                 </div>
                 <span class="queue-subtext" id="queue-subtext-desc">These are the songs you will hear when you hit play.</span>
               </div>
-              <div id="active-filter-chips" class="filter-chips-container"></div>
               <span id="track-count-badge" class="count-indicator">Loading tracks...</span>
             </div>
             <div class="toolbar-top-actions">
@@ -187,14 +152,8 @@
             <button id="batch-create-playlist-btn" class="btn btn-sm btn-primary" data-tooltip-title="Create Spotify Playlist" data-tooltip="Export all currently selected tracks to a brand new Spotify playlist.">
               ➕ Make Spotify Playlist
             </button>
-            <button id="batch-tag-btn" class="btn btn-sm btn-secondary" data-tooltip-title="Assign Tags" data-tooltip="Batch assign or modify custom tags for all selected songs." data-tooltip-shortcut="T">
-              🏷️ Assign Tags
-            </button>
             <button id="batch-shuffle-btn" class="btn btn-sm btn-accent" data-tooltip-title="Shuffle Selection" data-tooltip="This is a real random shuffle. It randomizes the selected songs every time you activate it.">
               🔀 Shuffle Selected
-            </button>
-            <button id="batch-remove-tags-btn" class="btn btn-sm btn-secondary" data-tooltip-title="Remove Tags" data-tooltip="Strip all custom tags from the selected songs in one click.">
-              ❌ Remove Tags
             </button>
             <button id="clear-selection-btn" class="btn btn-sm btn-ghost" data-tooltip-title="Deselect All" data-tooltip="Clear track selection." data-tooltip-shortcut="Esc">
               Clear (Esc)
@@ -212,7 +171,6 @@
                 <th class="col-num sortable" data-sort="order_index" data-tooltip-title="Sort by Number" data-tooltip="Sort tracks by custom sequence order.">#</th>
                 <th class="col-title sortable" data-sort="title" data-tooltip-title="Sort by Title" data-tooltip="Sort tracks alphabetically by song title.">Title</th>
                 <th class="col-artist sortable" data-sort="artist" data-tooltip-title="Sort by Artist" data-tooltip="Sort tracks alphabetically by primary artist name.">Artist</th>
-                <th class="col-tags" data-tooltip-title="Custom Tags" data-tooltip="Color-coded tags assigned to each song. Drag to tags in sidebar to organize.">Tags</th>
                 <th class="col-album sortable" data-sort="album" data-tooltip-title="Sort by Album" data-tooltip="Sort tracks alphabetically by album name.">Album</th>
                 <th class="col-duration sortable" data-sort="duration_ms" data-tooltip-title="Sort by Duration" data-tooltip="Sort tracks from shortest to longest duration.">⏱️</th>
               </tr>
@@ -224,7 +182,7 @@
             <img src="/icon.jpeg" alt="App Icon" style="width: 72px; height: 72px; object-fit: contain; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.5);">
             <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 8px;">Welcome to Kiki's Spotify Mixer</h2>
             <p style="font-size: 13px; color: var(--text-secondary); max-width: 420px; line-height: 1.5; margin-bottom: 20px;">
-              Connect your Spotify account with 1 click to load your liked songs, browse your playlists, assign custom tags, and use True Shuffle.
+              Connect your Spotify account with 1 click to load your liked songs, browse your playlists, and use True Shuffle.
             </p>
             <button id="hero-login-btn" class="btn btn-primary btn-lg" style="padding: 12px 28px; font-size: 14px; font-weight: 600;" data-tooltip-title="Spotify 1-Click Login" data-tooltip="Connect your Spotify account to start organizing and shuffling music.">
               🟢 1-Click Connect with Spotify
@@ -289,13 +247,6 @@
         <div id="right-playlist-controls" class="panel-subbar hidden">
           <select id="right-playlist-picker" data-tooltip-title="Select Playlist" data-tooltip="Choose one of your Spotify playlists to view and drag tracks from.">
             <option value="">Select Playlist to Browse...</option>
-          </select>
-        </div>
-
-        <!-- Tag Filter Selector on Right Panel (for Search & Playlist tabs) -->
-        <div id="right-tag-filter-bar" class="right-tag-filter-bar">
-          <select id="right-tag-picker" data-tooltip-title="Filter by Tag" data-tooltip="Filter right panel tracks by custom tags.">
-            <option value="">🏷️ All Tags (Filter by Tag...)</option>
           </select>
         </div>
 
@@ -552,19 +503,8 @@
     <div class="context-item" id="ctx-true-shuffle">🔀 True Shuffle Selected</div>
     <div class="context-item" id="ctx-make-playlist">➕ Make Spotify Playlist...</div>
     <div class="context-divider"></div>
-    <div class="context-item" id="ctx-assign-tags">🏷️ Assign Tags...</div>
-    <div class="context-item danger" id="ctx-remove-tags">❌ Remove Tags</div>
-    <div class="context-divider"></div>
     <div class="context-item danger" id="ctx-remove-from-list">🗑️ Remove Selected from List</div>
     <div class="context-item" id="ctx-keep-only-selected">🎯 Keep Only Selected (Remove Others)</div>
-  </div>
-
-  <!-- Custom Right-Click Context Menu for Tags in Left Sidebar -->
-  <div id="tag-context-menu" class="context-menu hidden">
-    <div class="context-item" id="ctx-tag-rename">✏️ Rename Tag</div>
-    <div class="context-item" id="ctx-tag-color">🎨 Change Tag Color</div>
-    <div class="context-divider"></div>
-    <div class="context-item danger" id="ctx-tag-delete">🗑️ Delete Tag</div>
   </div>
 
   <!-- Custom Right-Click Context Menu for Playlists -->
@@ -585,8 +525,7 @@
         <p id="confirm-modal-message" style="font-size: 12px; color: var(--text-secondary);"></p>
         <div id="confirm-modal-input-group" class="form-field hidden" style="margin-top: 8px;">
           <label id="confirm-modal-input-label">New Name:</label>
-          <input type="text" id="confirm-modal-input" placeholder="Enter tag name">
-          <input type="color" id="confirm-modal-color-input" value="#1DB954" class="hidden" style="margin-top: 6px; width: 100%; height: 32px; cursor: pointer;">
+          <input type="text" id="confirm-modal-input" placeholder="Enter name">
         </div>
       </div>
       <div class="modal-footer">
@@ -617,36 +556,6 @@
       <div class="modal-footer">
         <button id="cancel-create-playlist-modal" class="btn btn-secondary">Cancel</button>
         <button id="confirm-create-playlist-modal" class="btn btn-primary">Create & Sync to Spotify</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Tag Assignment -->
-  <div id="tag-modal" class="modal-overlay hidden">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3 id="tag-modal-title">🏷️ Assign Tags to Selected Songs</h3>
-        <button id="close-tag-modal" class="icon-btn">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="modal-search">
-          <input type="text" id="tag-search-input" placeholder="Search existing tags or type new tag name...">
-        </div>
-
-        <div class="modal-section-title">SELECT TAGS:</div>
-        <div id="modal-tags-checklist" class="modal-tags-checklist"></div>
-
-        <div class="create-new-tag-box">
-          <div class="create-tag-row">
-            <input type="text" id="new-tag-name-input" placeholder="New tag name (e.g. Focus, Energetic)">
-            <input type="color" id="new-tag-color-input" value="#1DB954" title="Choose Tag Color">
-            <button id="create-tag-submit-btn" class="btn btn-sm btn-primary">+ Add Tag</button>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button id="cancel-tag-modal" class="btn btn-secondary">Cancel</button>
-        <button id="apply-tag-modal" class="btn btn-accent">Apply Tags</button>
       </div>
     </div>
   </div>

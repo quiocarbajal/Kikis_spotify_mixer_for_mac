@@ -999,8 +999,7 @@ def extract_track_clean_dict(t: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "album_art_url": art_url,
         "duration_ms": t.get("duration_ms", 0) or 0,
         "album_release_date": release_date,
-        "popularity": t.get("popularity", 0) or 0,
-        "tags": []
+        "popularity": t.get("popularity", 0) or 0
     }
 
 def clean_seed_genre(val: str) -> Optional[str]:
@@ -1379,22 +1378,6 @@ def discover_boolean_matrix(
             if hidden_gem_target in ["track", "both"]:
                 if pop is not None and pop > 42:
                     continue
-
-        # Add discovery tags
-        track_tags = [{"name": "SurpriseMe", "color": "#1DB954"}]
-        if low_popularity_only:
-            if hidden_gem_target == "artist":
-                track_tags.append({"name": "💎 Hidden Gem (Artist)", "color": "#a855f7"})
-            elif hidden_gem_target == "track":
-                track_tags.append({"name": "💎 Hidden Gem (Song)", "color": "#a855f7"})
-            else:
-                track_tags.append({"name": "💎 Hidden Gem", "color": "#a855f7"})
-        elif pop is not None and 0 < pop <= 42:
-            track_tags.append({"name": "💎 Hidden Gem", "color": "#a855f7"})
-        elif pos_genres:
-            primary_genre = pos_genres[0]["value"].capitalize()
-            track_tags.append({"name": primary_genre, "color": "#3b82f6"})
-        t["tags"] = track_tags
 
         seen_track_keys.add(track_key)
         filtered.append(t)

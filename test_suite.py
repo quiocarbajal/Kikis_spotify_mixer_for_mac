@@ -2,9 +2,11 @@ import os
 import sys
 import unittest
 
+os.environ["DATABASE_PATH"] = os.path.abspath("test_spotify.db")
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend"))
 
 import database as db
+db.DB_PATH = os.path.abspath("test_spotify.db")
 import spotify_client as sp_client
 import applescript_controller as apple_ctrl
 from fastapi.testclient import TestClient
@@ -14,7 +16,6 @@ class TestSpotifySmartController(unittest.TestCase):
     
     @classmethod
     def setUpClass(cls):
-        os.environ["DATABASE_PATH"] = "test_spotify.db"
         db.init_db()
         
     @classmethod
@@ -22,45 +23,38 @@ class TestSpotifySmartController(unittest.TestCase):
         if os.path.exists("test_spotify.db"):
             os.remove("test_spotify.db")
 
-    def test_01_tags_management(self):
-        # Create custom tags
-        db.create_or_update_tag("Gym", "#ef4444")
-        db.create_or_update_tag("Coding", "#3b82f6")
-        
-        tags = db.get_all_tags()
-        tag_names = [t["name"] for t in tags]
-        self.assertIn("Gym", tag_names)
-        self.assertIn("Coding", tag_names)
-
-    def test_02_tracks_and_bulk_tagging(self):
+    def test_01_tracks_management(self):
         # Seed test tracks
         sample_tracks = [
             {"id": "t1", "uri": "spotify:track:t1", "title": "Track One", "artist": "Artist A", "album": "Album 1", "duration_ms": 200000},
             {"id": "t2", "uri": "spotify:track:t2", "title": "Track Two", "artist": "Artist B", "album": "Album 2", "duration_ms": 210000},
             {"id": "t3", "uri": "spotify:track:t3", "title": "Track Three", "artist": "Artist A", "album": "Album 1", "duration_ms": 180000},
-            {"id": "t4", "uri": "spotify:track:t4", "title": "Untagged Track", "artist": "Artist C", "album": "Album 3", "duration_ms": 190000},
+            {"id": "t4", "uri": "spotify:track:t4", "title": "Fourth Track", "artist": "Artist C", "album": "Album 3", "duration_ms": 190000},
         ]
         db.upsert_tracks(sample_tracks)
         
-        # Bulk tag t1 and t2 with 'Gym'
-        db.assign_tags_to_tracks(["t1", "t2"], ["Gym"])
-        # Tag t1 and t3 with 'Coding'
-        db.assign_tags_to_tracks(["t1", "t3"], ["Coding"])
-        
-        # Test Boolean Filter AND: 'Gym' AND 'Coding' (should be ONLY t1)
-        and_tracks = db.get_tracks_query(tags=["Gym", "Coding"], filter_mode="AND")
-        and_ids = [t["id"] for t in and_tracks]
-        self.assertEqual(and_ids, ["t1"])
-        
-        # Test Boolean Filter OR: 'Gym' OR 'Coding' (should be t1, t2, t3)
-        or_tracks = db.get_tracks_query(tags=["Gym", "Coding"], filter_mode="OR")
-        or_ids = sorted([t["id"] for t in or_tracks])
-        self.assertEqual(or_ids, ["t1", "t2", "t3"])
-        
-        # Test Untagged filter (should be t4)
-        untagged = db.get_tracks_query(untagged_only=True)
-        untagged_ids = [t["id"] for t in untagged]
-        self.assertIn("t4", untagged_ids)
+        all_tracks = db.get_tracks_query()
+        track_ids = [t["id"] for t in all_tracks]
+        self.assertIn("t1", track_ids)
+        self.assertIn("t2", track_ids)
+        self.assertIn("t3", track_ids)
+        self.assertIn("t4", track_ids)
+
+    def test_02_tracks_search_and_sorting(self):
+        # Test title search
+        search_res = db.get_tracks_query(search="Track One")
+        self.assertEqual(len(search_res), 1)
+        self.assertEqual(search_res[0]["id"], "t1")
+
+        # Test artist search
+        artist_res = db.get_tracks_query(search="Artist A")
+        self.assertEqual(len(artist_res), 2)
+        artist_ids = sorted([t["id"] for t in artist_res])
+        self.assertEqual(artist_ids, ["t1", "t3"])
+
+        # Test sorting
+        sorted_tracks = db.get_tracks_query(sort_by="duration_ms", sort_direction="desc")
+        self.assertEqual(sorted_tracks[0]["id"], "t2") # 210000ms is longest
 
     def test_03_custom_user_order(self):
         # Set initial custom playlist order
@@ -94,9 +88,9 @@ class TestSpotifySmartController(unittest.TestCase):
         self.assertIn("authenticated", data)
         self.assertIn("local_ip", data)
         
-        # Get Tags
-        res_tags = client.get("/api/tags")
-        self.assertEqual(res_tags.status_code, 200)
+        # Get Playlists
+        res_pl = client.get("/api/playlists")
+        self.assertEqual(res_pl.status_code, 200)
         
         # Get Tracks
         res_tracks = client.get("/api/tracks")

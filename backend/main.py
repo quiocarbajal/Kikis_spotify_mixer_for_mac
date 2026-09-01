@@ -44,21 +44,6 @@ class CredentialsRequest(BaseModel):
     client_secret: str
     redirect_uri: Optional[str] = "http://127.0.0.1:8888/callback"
 
-class TagCreateRequest(BaseModel):
-    name: str
-    color: Optional[str] = "#1DB954"
-
-class BatchTagRequest(BaseModel):
-    track_ids: List[str]
-    tag_names: List[str]
-
-class TagRenameRequest(BaseModel):
-    old_name: str
-    new_name: str
-
-class TagReorderRequest(BaseModel):
-    tag_names: List[str]
-
 class ReorderRequest(BaseModel):
     playlist_id: Optional[str] = "default"
     track_ids: List[str]
@@ -93,9 +78,6 @@ class VolumeRequest(BaseModel):
 class SeekRequest(BaseModel):
     position_ms: int
     device_id: Optional[str] = None
-
-class ExportTagRequest(BaseModel):
-    tag_name: str
 
 class BooleanTerm(BaseModel):
     value: str
@@ -142,6 +124,8 @@ def get_status():
     local_ip = get_local_ip()
     port = os.getenv("PORT", "8888")
     total_local_tracks = db.get_total_track_count() if auth else 0
+    liked_pl = next((p for p in db.get_playlists() if p["id"] == "liked_songs"), None) if auth else None
+    liked_tracks = int(liked_pl.get("total_tracks", 0) or len(liked_pl.get("track_ids", []))) if liked_pl else 0
     
     return {
         "authenticated": auth,
@@ -153,7 +137,8 @@ def get_status():
         "access_url": f"http://{local_ip}:{port}",
         "is_syncing": sync_state["is_syncing"],
         "has_synced_tracks": total_local_tracks > 0,
-        "total_tracks": total_local_tracks
+        "total_tracks": total_local_tracks,
+        "liked_tracks": liked_tracks
     }
 
 @app.get("/api/sync/status")
@@ -227,7 +212,7 @@ def search_tracks(q: str = Query(..., min_length=1), type: str = "all"):
     # 2. Also search local library
     local_results = db.get_tracks_query(search=q)
     
-    # Combine (local tracks first with their tags, then catalog tracks)
+    # Combine (local tracks first, then catalog tracks)
     seen_ids = set()
     combined = []
     for t in local_results:
@@ -237,7 +222,6 @@ def search_tracks(q: str = Query(..., min_length=1), type: str = "all"):
     for t in catalog_results:
         if t["id"] not in seen_ids:
             seen_ids.add(t["id"])
-            t["tags"] = []
             combined.append(t)
             
     # STRICT FILTERING ONLY
@@ -330,10 +314,7 @@ def sync_library(sync_playlists: bool = True):
 @app.get("/api/tracks")
 def get_tracks(
     playlist_id: Optional[str] = None,
-    tags: Optional[str] = None,
-    filter_mode: str = "AND",
     search: Optional[str] = None,
-    untagged_only: bool = False,
     sort_by: str = "order_index",
     sort_direction: str = "asc"
 ):
@@ -345,7 +326,7 @@ def get_tracks(
             if p_tracks:
                 db.upsert_tracks(p_tracks)
                 db.set_playlist_tracks(playlist_id, [t["id"] for t in p_tracks])
-    elif playlist_id == "liked_songs" or (not playlist_id and not tags and not search and not untagged_only):
+    elif playlist_id == "liked_songs" or (not playlist_id and not search):
         existing = db.get_tracks_query(playlist_id="liked_songs")
         if not existing and sp_client.is_authenticated():
             liked_tracks, _ = sp_client.fetch_all_liked_songs_with_status(limit=500)
@@ -361,13 +342,9 @@ def get_tracks(
                 }])
                 db.set_playlist_tracks("liked_songs", [t["id"] for t in liked_tracks])
 
-    tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
     tracks = db.get_tracks_query(
         playlist_id=playlist_id,
-        tags=tag_list,
-        filter_mode=filter_mode,
         search=search,
-        untagged_only=untagged_only,
         sort_by=sort_by,
         sort_direction=sort_direction
     )
@@ -474,59 +451,6 @@ def rename_playlist(playlist_id: str, req: PlaylistRenameRequest):
 def delete_playlist(playlist_id: str):
     db.delete_playlist(playlist_id)
     return {"success": True}
-
-# --- Tags Endpoints ---
-
-@app.get("/api/tags")
-def get_tags():
-    return {"tags": db.get_all_tags()}
-
-@app.post("/api/tags")
-def create_tag(req: TagCreateRequest):
-    tag = db.create_or_update_tag(req.name, req.color or "#1DB954")
-    return {"success": True, "tag": tag}
-
-@app.post("/api/tags/rename")
-def rename_tag(req: TagRenameRequest):
-    try:
-        res = db.rename_tag(req.old_name, req.new_name)
-        return {"success": True, **res}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@app.post("/api/tags/reorder")
-def reorder_tags(req: TagReorderRequest):
-    db.reorder_tags(req.tag_names)
-    return {"success": True, "count": len(req.tag_names)}
-
-@app.delete("/api/tags")
-def delete_tag_query(name: str = Query(...)):
-    db.delete_tag(name)
-    return {"success": True}
-
-@app.delete("/api/tags/{name:path}")
-def delete_tag(name: str):
-    db.delete_tag(name)
-    return {"success": True}
-
-@app.post("/api/tags/assign")
-def assign_tags(req: BatchTagRequest):
-    db.assign_tags_to_tracks(req.track_ids, req.tag_names)
-    return {"success": True, "updated_tracks": len(req.track_ids)}
-
-@app.post("/api/tags/remove")
-def remove_tags(req: BatchTagRequest):
-    db.remove_tags_from_tracks(req.track_ids, req.tag_names)
-    return {"success": True, "updated_tracks": len(req.track_ids)}
-
-@app.post("/api/playlists/export-tag")
-def export_tag(req: ExportTagRequest):
-    tracks = db.get_tracks_query(tags=[req.tag_name], filter_mode="AND")
-    uris = [t["uri"] for t in tracks]
-    if not uris:
-        raise HTTPException(status_code=400, detail=f"No tracks found for tag #{req.tag_name}")
-    res = sp_client.export_tag_to_playlist(req.tag_name, uris)
-    return res
 
 # --- "🎲 Surprise Me!" Discovery Endpoints ---
 

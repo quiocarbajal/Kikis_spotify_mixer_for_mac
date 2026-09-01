@@ -8,9 +8,6 @@ const state = {
   selectedIds: new Set(),
   lastSelectedId: null,
   lastClickedIndex: 0,
-  tags: [],
-  activeTags: [],
-  filterMode: 'AND',
   searchQuery: '',
   activeView: 'liked_songs',
   
@@ -23,7 +20,6 @@ const state = {
   // Right Panel (Dual Browser & Discovery)
   rightTab: 'search', // 'search', 'playlist', or 'discovery'
   searchModifier: 'all', // 'all', 'track', 'artist', 'album'
-  rightFilterTag: '',
   rightTracks: [],
   rightSelectedIds: new Set(),
   rightLastSelectedId: null,
@@ -90,10 +86,7 @@ const DOM = {
   rightPanel: document.getElementById('right-panel'),
   
   navItems: document.querySelectorAll('.nav-item'),
-  tagsList: document.getElementById('tags-list'),
   playlistsList: document.getElementById('playlists-list'),
-  filterModeRadios: document.querySelectorAll('input[name="filter-mode"]'),
-  createTagSidebarBtn: document.getElementById('create-tag-sidebar-btn'),
   remoteUrlDisplay: document.getElementById('remote-url-display'),
   
   // Main Table & Toolbar
@@ -101,7 +94,6 @@ const DOM = {
   tracksTable: document.getElementById('tracks-table'),
   selectAllCheckbox: document.getElementById('select-all-checkbox'),
   trackCountBadge: document.getElementById('track-count-badge'),
-  activeFilterChips: document.getElementById('active-filter-chips'),
   playActiveListBtn: document.getElementById('play-active-list-btn'),
   shuffleActiveListBtn: document.getElementById('shuffle-active-list-btn'),
   saveAsPlaylistBtn: document.getElementById('save-as-playlist-btn'),
@@ -126,8 +118,6 @@ const DOM = {
   selectionActionBar: document.getElementById('selection-action-bar'),
   selectedCountText: document.getElementById('selected-count-text'),
   batchCreatePlaylistBtn: document.getElementById('batch-create-playlist-btn'),
-  batchTagBtn: document.getElementById('batch-tag-btn'),
-  batchRemoveTagsBtn: document.getElementById('batch-remove-tags-btn'),
   batchShuffleBtn: document.getElementById('batch-shuffle-btn'),
   clearSelectionBtn: document.getElementById('clear-selection-btn'),
   
@@ -138,12 +128,10 @@ const DOM = {
   rightSearchControls: document.getElementById('right-search-controls'),
   rightPlaylistControls: document.getElementById('right-playlist-controls'),
   rightDiscoveryControls: document.getElementById('right-discovery-controls'),
-  rightTagFilterBar: document.getElementById('right-tag-filter-bar'),
   rightSearchInput: document.getElementById('right-search-input'),
   rightSearchSubmitBtn: document.getElementById('right-search-submit-btn'),
   searchModPills: document.querySelectorAll('.search-mod-pill'),
   rightPlaylistPicker: document.getElementById('right-playlist-picker'),
-  rightTagPicker: document.getElementById('right-tag-picker'),
   rightStandardActionHeader: document.getElementById('right-standard-action-header'),
   rightSelectedText: document.getElementById('right-selected-text'),
   rightAddSelectedBtn: document.getElementById('right-add-selected-btn'),
@@ -211,16 +199,6 @@ const DOM = {
   deviceSelect: document.getElementById('device-select'),
   
   // Modals
-  tagModal: document.getElementById('tag-modal'),
-  closeTagModal: document.getElementById('close-tag-modal'),
-  cancelTagModal: document.getElementById('cancel-tag-modal'),
-  applyTagModal: document.getElementById('apply-tag-modal'),
-  modalTagsChecklist: document.getElementById('modal-tags-checklist'),
-  newTagNameInput: document.getElementById('new-tag-name-input'),
-  newTagColorInput: document.getElementById('new-tag-color-input'),
-  createTagSubmitBtn: document.getElementById('create-tag-submit-btn'),
-  tagSearchInput: document.getElementById('tag-search-input'),
-  
   createPlaylistModal: document.getElementById('create-playlist-modal'),
   closeCreatePlaylistModal: document.getElementById('close-create-playlist-modal'),
   cancelCreatePlaylistModal: document.getElementById('cancel-create-playlist-modal'),
@@ -244,18 +222,15 @@ const DOM = {
   confirmModalInputGroup: document.getElementById('confirm-modal-input-group'),
   confirmModalInputLabel: document.getElementById('confirm-modal-input-label'),
   confirmModalInput: document.getElementById('confirm-modal-input'),
-  confirmModalColorInput: document.getElementById('confirm-modal-color-input'),
   confirmModalCancelBtn: document.getElementById('confirm-modal-cancel-btn'),
   confirmModalSubmitBtn: document.getElementById('confirm-modal-submit-btn'),
   
   // Context Menus
   customContextMenu: document.getElementById('custom-context-menu'),
-  tagContextMenu: document.getElementById('tag-context-menu'),
   playlistContextMenu: document.getElementById('playlist-context-menu'),
   toastContainer: document.getElementById('toast-container')
 };
 
-let activeContextMenuTag = null;
 let activeContextMenuPlaylist = null;
 let confirmModalCallback = null;
 
@@ -276,10 +251,9 @@ const I18N = {
     syncStageFetchingPlaylists: 'Fetching your Spotify playlists...',
     syncStageDone: '✅ Library synced successfully!',
     connectHeroTitle: "Welcome to Kiki's Spotify Mixer",
-    connectHeroDesc: 'Connect your Spotify account with 1 click to load your liked songs, browse your playlists, assign custom tags, and use True Shuffle.',
+    connectHeroDesc: 'Connect your Spotify account with 1 click to load your liked songs, browse your playlists, and use True Shuffle.',
     connectHeroBtn: '🟢 1-Click Connect with Spotify',
     connectPromptPlaylists: 'Connect Spotify to load your playlists.',
-    connectPromptTags: 'Connect Spotify to create tags.',
     settingsBtn: 'Settings & Setup',
     checking: 'Checking...',
     connected: 'Connected',
@@ -289,14 +263,6 @@ const I18N = {
     libraryTitle: 'LIBRARY',
     likedSongs: 'Liked Songs',
     allTracks: 'All Tracks',
-    untaggedSongs: 'Untagged Songs',
-    customTagsTitle: 'CUSTOM TAGS',
-    createTag: 'Create New Tag',
-    tagFilterMode: 'Tag Filter Mode:',
-    andMode: 'AND',
-    orMode: 'OR',
-    notMode: 'NOT',
-    dragHint: '💡 Drag tags onto songs (or songs onto tags) to label',
     yourPlaylists: 'YOUR PLAYLISTS',
     androidAccess: '📱 Android Phone Access',
     androidCardDesc: 'Open this URL on your phone browser on the same Wi-Fi to control playback remotely.',
@@ -317,22 +283,20 @@ const I18N = {
     // Floating Bar
     selectedCount: '🟢 {count} track{s} selected',
     makePlaylistBtn: '➕ Make Spotify Playlist',
-    assignTagsBtn: '🏷️ Assign Tags',
     shuffleSelectedBtn: '🔀 Shuffle Selected',
-    removeTagsBtn: '❌ Remove Tags',
     clearEsc: 'Clear (Esc)',
     
     // Headers
     colNumber: '#',
     colTitle: 'Title',
     colArtist: 'Artist',
-    colTags: 'Tags',
     colAlbum: 'Album',
     colDuration: '⏱️',
     
     // Right Panel
     tabSpotifySearch: '🔍 Spotify Search',
-    tabBrowseList: '📑 Browse 2nd List',
+    tabBrowseList: '📑 Browse Playlists',
+    tabDiscovery: '🎲 Surprise Me!',
     searchCatalogPlaceholder: 'Search Spotify catalog...',
     searchBtn: 'Search',
     modAll: 'All',
@@ -340,7 +304,6 @@ const I18N = {
     modArtist: '🎤 Artist',
     modLyrics: '📜 Lyrics',
     selectPlaylistOption: 'Select Playlist to Browse...',
-    allTagsFilterOption: '🏷️ All Tags (Filter by Tag...)',
     addSelectedBtn: '➕ Add to Main List',
     rightSearchPlaceholder: 'Type above to search Spotify or choose a playlist to browse songs.',
     
@@ -353,15 +316,10 @@ const I18N = {
     ctxPlayFromHere: '▶ Play from Here',
     ctxTrueShuffleSelected: '🔀 True Shuffle Selected',
     ctxMakePlaylist: '➕ Make Spotify Playlist...',
-    ctxAssignTags: '🏷️ Assign Tags...',
-    ctxRemoveTags: '❌ Remove Tags',
     ctxRemoveFromList: '🗑️ Remove Selected from List',
     ctxKeepOnlySelected: '🎯 Keep Only Selected (Remove Others)',
     toastRemovedFromList: '🗑️ Removed {count} track{s} from active list (Cmd+Z to undo)',
     toastKeptOnlySelected: '🎯 Kept {kept} track{s}, removed {removed} other{s} (Cmd+Z to undo)',
-    ctxRenameTag: '✏️ Rename Tag',
-    ctxChangeTagColor: '🎨 Change Tag Color',
-    ctxDeleteTag: '🗑️ Delete Tag',
     ctxRenamePlaylist: '✏️ Rename Playlist',
     ctxDeletePlaylist: '🗑️ Delete Playlist',
     
@@ -382,16 +340,6 @@ const I18N = {
     tipLikedSongs: 'All songs saved to your Spotify Liked Songs library.',
     tipAllTracksTitle: 'All Tracks',
     tipAllTracks: 'Consolidated master list of all synced songs across your library.',
-    tipUntaggedTitle: 'Untagged Songs',
-    tipUntagged: 'Songs without any assigned custom tags. Perfect for organizing!',
-    tipNewTagTitle: 'New Custom Tag',
-    tipNewTag: 'Create a new color-coded tag to label and filter songs.',
-    tipAndModeTitle: 'AND Mode',
-    tipAndMode: 'Show only songs that contain ALL active selected tags.',
-    tipOrModeTitle: 'OR Mode',
-    tipOrMode: 'Show songs that contain ANY of the active selected tags.',
-    tipNotModeTitle: 'NOT Mode',
-    tipNotMode: 'Exclude songs that have any of the active selected tags.',
     tipResizeSidebarTitle: 'Resize Sidebar',
     tipResizeSidebar: 'Click and drag horizontally to resize sidebar width.',
     tipPlayListTitle: 'Play Active List',
@@ -428,20 +376,14 @@ const I18N = {
     tipSortTitle: 'Sort tracks alphabetically by song title.',
     tipSortArtistTitle: 'Sort by Artist',
     tipSortArtist: 'Sort tracks alphabetically by primary artist name.',
-    tipTagsHeaderTitle: 'Custom Tags',
-    tipTagsHeader: 'Color-coded tags assigned to each song. Drag to tags in sidebar to organize.',
     tipSortAlbumTitle: 'Sort by Album',
     tipSortAlbum: 'Sort tracks alphabetically by album name.',
     tipSortDurationTitle: 'Sort by Duration',
     tipSortDuration: 'Sort tracks from shortest to longest duration.',
     tipCreatePlaylistTitle: 'Create Spotify Playlist',
     tipCreatePlaylist: 'Export all currently selected tracks to a brand new Spotify playlist.',
-    tipAssignTagsTitle: 'Assign Tags',
-    tipAssignTags: 'Batch assign or modify custom tags for all selected songs.',
     tipShuffleSelectedTitle: 'Shuffle Selection',
     tipShuffleSelected: 'This is a real random shuffle. It randomizes the selected songs every time you activate it.',
-    tipRemoveTagsTitle: 'Remove Tags',
-    tipRemoveTags: 'Strip all custom tags from the selected songs in one click.',
     tipDeselectAllTitle: 'Deselect All',
     tipDeselectAll: 'Clear track selection.',
     tipResizeRightTitle: 'Resize Right Panel',
@@ -464,8 +406,6 @@ const I18N = {
     tipModLyrics: 'Search Spotify catalog by lyrics and spoken phrases.',
     tipSelectPlaylistTitle: 'Select Playlist',
     tipSelectPlaylist: 'Choose one of your Spotify playlists to view and drag tracks from.',
-    tipFilterTagRightTitle: 'Filter by Tag',
-    tipFilterTagRight: 'Filter right panel tracks by custom tags.',
     tipAddSelectedTitle: 'Add to Main List',
     tipAddSelected: 'Append selected songs from the right panel directly into your active list.',
     tipNowPlayingTitle: 'Now Playing',
@@ -482,7 +422,6 @@ const I18N = {
     tipDevice: 'Select active Spotify Connect output device (Mac, Phone, Speaker).',
     
     // Discovery Engine
-    tabDiscovery: '🎲 Surprise Me!',
     discoveryPanelHeading: 'Discovery Engine',
     discoveryHelpTitle: 'Discovery Engine Guide',
     discoveryHelp: 'Combine artists, genres, decades and tracks with [+ AND] (include) and [- NOT] (exclude) modifiers. Strict filters guarantee you will not hear songs already in your Liked Songs or Playlists.',
@@ -566,10 +505,9 @@ const I18N = {
     syncStageFetchingPlaylists: 'Obteniendo tus playlists de Spotify...',
     syncStageDone: '✅ ¡Biblioteca sincronizada con éxito!',
     connectHeroTitle: "Bienvenido a Kiki's Spotify Mixer",
-    connectHeroDesc: 'Conecta tu cuenta de Spotify con 1 clic para cargar tus canciones guardadas, explorar tus playlists, asignar etiquetas y usar Aleatorio Real.',
+    connectHeroDesc: 'Conecta tu cuenta de Spotify con 1 clic para cargar tus canciones guardadas, explorar tus playlists y usar Aleatorio Real.',
     connectHeroBtn: '🟢 Conectar con Spotify en 1 clic',
     connectPromptPlaylists: 'Conecta Spotify para cargar tus playlists.',
-    connectPromptTags: 'Conecta Spotify para crear etiquetas.',
     settingsBtn: 'Configuración',
     checking: 'Comprobando...',
     connected: 'Conectado',
@@ -579,14 +517,6 @@ const I18N = {
     libraryTitle: 'BIBLIOTECA',
     likedSongs: 'Canciones que te gustan',
     allTracks: 'Todas las canciones',
-    untaggedSongs: 'Canciones sin etiquetar',
-    customTagsTitle: 'ETIQUETAS PERSONALIZADAS',
-    createTag: 'Crear nueva etiqueta',
-    tagFilterMode: 'Modo de filtro:',
-    andMode: 'Y (AND)',
-    orMode: 'O (OR)',
-    notMode: 'NO (NOT)',
-    dragHint: '💡 Arrastra etiquetas a canciones (o canciones a etiquetas)',
     yourPlaylists: 'TUS PLAYLISTS',
     androidAccess: '📱 Acceso desde Android',
     androidCardDesc: 'Abre esta URL en el navegador de tu teléfono en la misma red Wi-Fi para control remoto.',
@@ -607,16 +537,13 @@ const I18N = {
     // Floating Bar
     selectedCount: '🟢 {count} canción{es} seleccionada{s}',
     makePlaylistBtn: '➕ Crear playlist en Spotify',
-    assignTagsBtn: '🏷️ Asignar etiquetas',
     shuffleSelectedBtn: '🔀 Mezclar selección',
-    removeTagsBtn: '❌ Quitar etiquetas',
     clearEsc: 'Deseleccionar (Esc)',
     
     // Headers
     colNumber: '#',
     colTitle: 'Título',
     colArtist: 'Artista',
-    colTags: 'Etiquetas',
     colAlbum: 'Álbum',
     colDuration: '⏱️',
     
@@ -631,7 +558,6 @@ const I18N = {
     modArtist: '🎤 Artista',
     modLyrics: '📜 Letras',
     selectPlaylistOption: 'Selecciona una playlist para explorar...',
-    allTagsFilterOption: '🏷️ Todas las etiquetas (Filtrar...)',
     addSelectedBtn: '➕ Añadir a lista principal',
     rightSearchPlaceholder: 'Escribe arriba para buscar en Spotify o elige una playlist para explorar.',
     
@@ -644,15 +570,10 @@ const I18N = {
     ctxPlayFromHere: '▶ Reproducir desde aquí',
     ctxTrueShuffleSelected: '🔀 Aleatorio Real de seleccionadas',
     ctxMakePlaylist: '➕ Crear playlist en Spotify...',
-    ctxAssignTags: '🏷️ Asignar etiquetas...',
-    ctxRemoveTags: '❌ Quitar etiquetas',
     ctxRemoveFromList: '🗑️ Quitar seleccionadas de la lista',
     ctxKeepOnlySelected: '🎯 Mantener solo seleccionadas (Quitar las demás)',
     toastRemovedFromList: '🗑️ Se quitaron {count} canción{s} de la lista activa (Cmd+Z para deshacer)',
     toastKeptOnlySelected: '🎯 Se mantuvieron {kept} canción{es}, se quitaron {removed} restante{s} (Cmd+Z para deshacer)',
-    ctxRenameTag: '✏️ Renombrar etiqueta',
-    ctxChangeTagColor: '🎨 Cambiar color de etiqueta',
-    ctxDeleteTag: '🗑️ Eliminar etiqueta',
     ctxRenamePlaylist: '✏️ Renombrar playlist',
     ctxDeletePlaylist: '🗑️ Eliminar playlist',
     
@@ -673,16 +594,6 @@ const I18N = {
     tipLikedSongs: 'Todas las canciones guardadas en tu biblioteca de Canciones que te gustan.',
     tipAllTracksTitle: 'Todas las canciones',
     tipAllTracks: 'Lista maestra consolidada de todas las canciones sincronizadas.',
-    tipUntaggedTitle: 'Canciones sin etiquetar',
-    tipUntagged: 'Canciones que aún no tienen etiquetas personalizadas. ¡Ideal para organizarte!',
-    tipNewTagTitle: 'Nueva etiqueta',
-    tipNewTag: 'Crea una nueva etiqueta con color para organizar tus canciones.',
-    tipAndModeTitle: 'Modo Y (AND)',
-    tipAndMode: 'Muestra únicamente canciones que tengan TODAS las etiquetas seleccionadas.',
-    tipOrModeTitle: 'Modo O (OR)',
-    tipOrMode: 'Muestra canciones que tengan CUALQUIERA de las etiquetas seleccionadas.',
-    tipNotModeTitle: 'Modo NO (NOT)',
-    tipNotMode: 'Excluye canciones que tengan cualquiera de las etiquetas seleccionadas.',
     tipResizeSidebarTitle: 'Redimensionar barra lateral',
     tipResizeSidebar: 'Haz clic y arrastra horizontalmente para cambiar el ancho de la barra lateral.',
     tipPlayListTitle: 'Reproducir lista activa',
@@ -719,20 +630,14 @@ const I18N = {
     tipSortTitle: 'Ordena las canciones alfabéticamente por título.',
     tipSortArtistTitle: 'Ordenar por artista',
     tipSortArtist: 'Ordena las canciones alfabéticamente por nombre del artista principal.',
-    tipTagsHeaderTitle: 'Etiquetas personalizadas',
-    tipTagsHeader: 'Etiquetas con color asignadas a cada canción. Arrástralas para organizar.',
     tipSortAlbumTitle: 'Ordenar por álbum',
     tipSortAlbum: 'Ordena las canciones alfabéticamente por nombre de álbum.',
     tipSortDurationTitle: 'Ordenar por duración',
     tipSortDuration: 'Ordena las canciones de menor a mayor duración.',
     tipCreatePlaylistTitle: 'Crear playlist en Spotify',
     tipCreatePlaylist: 'Exporta todas las canciones seleccionadas a una nueva playlist en tu cuenta de Spotify.',
-    tipAssignTagsTitle: 'Asignar etiquetas',
-    tipAssignTags: 'Asigna o modifica etiquetas personalizadas a todas las canciones seleccionadas.',
     tipShuffleSelectedTitle: 'Mezclar selección',
     tipShuffleSelected: 'Este es un modo aleatorio real. Mezcla las canciones seleccionadas cada vez que lo activas.',
-    tipRemoveTagsTitle: 'Quitar etiquetas',
-    tipRemoveTags: 'Elimina todas las etiquetas de las canciones seleccionadas en un solo clic.',
     tipDeselectAllTitle: 'Deseleccionar todo',
     tipDeselectAll: 'Borra la selección de canciones.',
     tipResizeRightTitle: 'Redimensionar panel derecho',
@@ -755,8 +660,6 @@ const I18N = {
     tipModLyrics: 'Busca canciones en el catálogo de Spotify por fragmentos de su letra.',
     tipSelectPlaylistTitle: 'Seleccionar playlist',
     tipSelectPlaylist: 'Elige una de tus playlists de Spotify para ver y arrastrar canciones.',
-    tipFilterTagRightTitle: 'Filtrar por etiqueta',
-    tipFilterTagRight: 'Filtra las canciones del panel derecho según sus etiquetas personalizadas.',
     tipAddSelectedTitle: 'Añadir a lista principal',
     tipAddSelected: 'Agrega las canciones seleccionadas del panel derecho directamente a tu lista activa.',
     tipNowPlayingTitle: 'En reproducción',
@@ -844,24 +747,24 @@ const I18N = {
 };
 
 function t(key, params = {}) {
-  const lang = state.currentLang || 'es';
-  let text = (I18N[lang] && I18N[lang][key]) || (I18N.en && I18N.en[key]) || key;
-  for (const [k, v] of Object.entries(params)) {
-    text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
-  }
-  return text;
+  const dict = I18N[state.currentLang] || I18N.es;
+  let val = dict[key] || I18N.en[key] || key;
+  Object.keys(params).forEach(p => {
+    val = val.replace(new RegExp(`\\{${p}\\}`, 'g'), params[p]);
+  });
+  return val;
 }
 
 function applyLanguage(lang) {
   state.currentLang = lang;
   localStorage.setItem('kiki_spotify_lang', lang);
 
-  // Dual-Flag Toggle Active State (🇬🇧 EN vs 🇦🇷 ES)
+  // Update language toggle button visual states
   if (DOM.langBtnEn) DOM.langBtnEn.classList.toggle('active', lang === 'en');
   if (DOM.langBtnEs) DOM.langBtnEs.classList.toggle('active', lang === 'es');
 
-  // Header Sub-badge
-  const subBadge = document.querySelector('.sub-badge');
+  // Subtitle badge
+  const subBadge = document.querySelector('.app-sub-badge');
   if (subBadge) subBadge.textContent = t('appSubBadge');
 
   // Search input
@@ -879,13 +782,13 @@ function applyLanguage(lang) {
   if (DOM.topSyncBtn) {
     const txt = DOM.topSyncBtn.querySelector('.btn-text');
     if (txt) txt.textContent = t('syncBtn');
-    DOM.topSyncBtn.setAttribute('data-tooltip-title', t('tipSyncTitle') || 'Sync Spotify Library');
-    DOM.topSyncBtn.setAttribute('data-tooltip', t('tipSync') || 'Download all your Liked Songs and playlists from Spotify to your local library.');
+    DOM.topSyncBtn.setAttribute('data-tooltip-title', t('tipSyncTitle'));
+    DOM.topSyncBtn.setAttribute('data-tooltip', t('tipSync'));
   }
   if (DOM.sidebarSyncBtn) {
     DOM.sidebarSyncBtn.textContent = '🔄 ' + (state.currentLang === 'es' ? 'Sincronizar' : 'Sync');
-    DOM.sidebarSyncBtn.setAttribute('data-tooltip-title', t('tipSyncTitle') || 'Sync Spotify Library');
-    DOM.sidebarSyncBtn.setAttribute('data-tooltip', t('tipSync') || 'Download all your Liked Songs and playlists from Spotify to your local library.');
+    DOM.sidebarSyncBtn.setAttribute('data-tooltip-title', t('tipSyncTitle'));
+    DOM.sidebarSyncBtn.setAttribute('data-tooltip', t('tipSync'));
   }
 
   const loginText = DOM.loginBtn?.querySelector('.btn-text');
@@ -902,8 +805,7 @@ function applyLanguage(lang) {
   // Sidebar Sections
   const sidebarTitles = document.querySelectorAll('#sidebar .section-title');
   if (sidebarTitles[0]) sidebarTitles[0].textContent = t('libraryTitle');
-  if (sidebarTitles[1]) sidebarTitles[1].textContent = t('customTagsTitle');
-  if (sidebarTitles[2]) sidebarTitles[2].textContent = t('yourPlaylists');
+  if (sidebarTitles[1]) sidebarTitles[1].textContent = t('yourPlaylists');
 
   // Sidebar Nav Items
   const navLiked = document.querySelector('.nav-item[data-view="liked_songs"]');
@@ -920,47 +822,6 @@ function applyLanguage(lang) {
     navAll.setAttribute('data-tooltip-title', t('tipAllTracksTitle'));
     navAll.setAttribute('data-tooltip', t('tipAllTracks'));
   }
-  const navUntagged = document.querySelector('.nav-item[data-view="untagged"]');
-  if (navUntagged) {
-    const lbl = navUntagged.querySelector('.nav-label');
-    if (lbl) lbl.textContent = t('untaggedSongs');
-    navUntagged.setAttribute('data-tooltip-title', t('tipUntaggedTitle'));
-    navUntagged.setAttribute('data-tooltip', t('tipUntagged'));
-  }
-
-  // Custom tags & filters
-  if (DOM.createTagSidebarBtn) {
-    DOM.createTagSidebarBtn.setAttribute('data-tooltip-title', t('tipNewTagTitle'));
-    DOM.createTagSidebarBtn.setAttribute('data-tooltip', t('tipNewTag'));
-  }
-
-  const filterModeLabel = document.querySelector('.filter-mode-label');
-  if (filterModeLabel) filterModeLabel.textContent = t('tagFilterMode');
-
-  const pillAnd = document.querySelector('label.radio-pill:has(input[value="AND"])');
-  if (pillAnd) {
-    const span = pillAnd.querySelector('span');
-    if (span) span.textContent = t('andMode');
-    pillAnd.setAttribute('data-tooltip-title', t('tipAndModeTitle'));
-    pillAnd.setAttribute('data-tooltip', t('tipAndMode'));
-  }
-  const pillOr = document.querySelector('label.radio-pill:has(input[value="OR"])');
-  if (pillOr) {
-    const span = pillOr.querySelector('span');
-    if (span) span.textContent = t('orMode');
-    pillOr.setAttribute('data-tooltip-title', t('tipOrModeTitle'));
-    pillOr.setAttribute('data-tooltip', t('tipOrMode'));
-  }
-  const pillNot = document.querySelector('label.radio-pill:has(input[value="NOT"])');
-  if (pillNot) {
-    const span = pillNot.querySelector('span');
-    if (span) span.textContent = t('notMode');
-    pillNot.setAttribute('data-tooltip-title', t('tipNotModeTitle'));
-    pillNot.setAttribute('data-tooltip', t('tipNotMode'));
-  }
-
-  const dragTip = document.getElementById('tags-dropzone-tip');
-  if (dragTip) dragTip.textContent = t('dragHint');
 
   const remoteHeader = document.querySelector('.remote-header');
   if (remoteHeader) remoteHeader.textContent = t('androidAccess');
@@ -1046,12 +907,6 @@ function applyLanguage(lang) {
     thArtist.setAttribute('data-tooltip-title', t('tipSortArtistTitle'));
     thArtist.setAttribute('data-tooltip', t('tipSortArtist'));
   }
-  const thTags = document.querySelector('th.col-tags');
-  if (thTags) {
-    thTags.textContent = t('colTags');
-    thTags.setAttribute('data-tooltip-title', t('tipTagsHeaderTitle'));
-    thTags.setAttribute('data-tooltip', t('tipTagsHeader'));
-  }
   const thAlbum = document.querySelector('th[data-sort="album"]');
   if (thAlbum) {
     thAlbum.textContent = t('colAlbum');
@@ -1070,20 +925,10 @@ function applyLanguage(lang) {
     DOM.batchCreatePlaylistBtn.setAttribute('data-tooltip-title', t('tipCreatePlaylistTitle'));
     DOM.batchCreatePlaylistBtn.setAttribute('data-tooltip', t('tipCreatePlaylist'));
   }
-  if (DOM.batchTagBtn) {
-    DOM.batchTagBtn.textContent = t('assignTagsBtn');
-    DOM.batchTagBtn.setAttribute('data-tooltip-title', t('tipAssignTagsTitle'));
-    DOM.batchTagBtn.setAttribute('data-tooltip', t('tipAssignTags'));
-  }
   if (DOM.batchShuffleBtn) {
     DOM.batchShuffleBtn.textContent = t('shuffleSelectedBtn');
     DOM.batchShuffleBtn.setAttribute('data-tooltip-title', t('tipShuffleSelectedTitle'));
     DOM.batchShuffleBtn.setAttribute('data-tooltip', t('tipShuffleSelected'));
-  }
-  if (DOM.batchRemoveTagsBtn) {
-    DOM.batchRemoveTagsBtn.textContent = t('removeTagsBtn');
-    DOM.batchRemoveTagsBtn.setAttribute('data-tooltip-title', t('tipRemoveTagsTitle'));
-    DOM.batchRemoveTagsBtn.setAttribute('data-tooltip', t('tipRemoveTags'));
   }
   if (DOM.clearSelectionBtn) {
     DOM.clearSelectionBtn.textContent = t('clearEsc');
@@ -1272,21 +1117,10 @@ function applyLanguage(lang) {
   if (ctxShuffle) ctxShuffle.textContent = t('ctxTrueShuffleSelected');
   const ctxPl = document.getElementById('ctx-make-playlist');
   if (ctxPl) ctxPl.textContent = t('ctxMakePlaylist');
-  const ctxAssign = document.getElementById('ctx-assign-tags');
-  if (ctxAssign) ctxAssign.textContent = t('ctxAssignTags');
-  const ctxRemove = document.getElementById('ctx-remove-tags');
-  if (ctxRemove) ctxRemove.textContent = t('ctxRemoveTags');
   const ctxRemFromList = document.getElementById('ctx-remove-from-list');
   if (ctxRemFromList) ctxRemFromList.textContent = t('ctxRemoveFromList');
   const ctxKeepOnly = document.getElementById('ctx-keep-only-selected');
   if (ctxKeepOnly) ctxKeepOnly.textContent = t('ctxKeepOnlySelected');
-
-  const ctxTagRename = document.getElementById('ctx-tag-rename');
-  if (ctxTagRename) ctxTagRename.textContent = t('ctxRenameTag');
-  const ctxTagColor = document.getElementById('ctx-tag-color');
-  if (ctxTagColor) ctxTagColor.textContent = t('ctxChangeTagColor');
-  const ctxTagDelete = document.getElementById('ctx-tag-delete');
-  if (ctxTagDelete) ctxTagDelete.textContent = t('ctxDeleteTag');
 
   const ctxPlRename = document.getElementById('ctx-playlist-rename');
   if (ctxPlRename) ctxPlRename.textContent = t('ctxRenamePlaylist');
@@ -1309,7 +1143,6 @@ function applyLanguage(lang) {
   // Dynamic UI re-render
   updateCounts(state.tracks.length);
   updateSelectionUI();
-  renderSidebarTags();
 }
 
 // --- Sync State & Auto-Sync Management ---
@@ -1376,7 +1209,6 @@ async function triggerAutoSync(silent = false) {
       showToast(msg);
     }
     await checkStatus();
-    await loadTags();
     await loadPlaylists();
     await loadTracks();
   } catch (e) {
@@ -1399,7 +1231,6 @@ function startAuthPoller() {
       if (data && data.authenticated) {
         stopAuthPoller();
         await checkStatus();
-        await loadTags();
         await loadPlaylists();
         await loadTracks();
         triggerAutoSync();
@@ -1431,7 +1262,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const statusData = await checkStatus();
   if (state.authenticated) {
-    try { await loadTags(); } catch (e) {}
     try { await loadPlaylists(); } catch (e) {}
     try { await loadTracks(); } catch (e) {}
     
@@ -1536,6 +1366,14 @@ async function checkStatus() {
       if (!state.isSyncing) {
         DOM.tracksTable?.classList.remove('hidden');
       }
+      if (data.total_tracks !== undefined) {
+        const countAll = document.getElementById('count-all');
+        if (countAll) countAll.textContent = data.total_tracks;
+      }
+      if (data.liked_tracks !== undefined) {
+        const countLiked = document.getElementById('count-liked');
+        if (countLiked) countLiked.textContent = data.liked_tracks;
+      }
       loadDevices();
       stopAuthPoller();
     } else {
@@ -1549,7 +1387,6 @@ async function checkStatus() {
       }
       DOM.tracksTbody.innerHTML = '';
       DOM.playlistsList.innerHTML = `<div style="padding:12px 16px; font-size:11px; color:#888;">${t('connectPromptPlaylists') || 'Connect Spotify to load your playlists.'}</div>`;
-      DOM.tagsList.innerHTML = `<div style="padding:12px 16px; font-size:11px; color:#888;">${t('connectPromptTags') || 'Connect Spotify to create tags.'}</div>`;
       startAuthPoller();
     }
     return data;
@@ -1577,157 +1414,6 @@ async function loadDevices() {
   } catch (e) {}
 }
 
-// --- Tags Operations ---
-async function loadTags() {
-  try {
-    const data = await api('/api/tags');
-    state.tags = data.tags || [];
-    
-    // Automatically purge and deselect any deleted or non-existent tags
-    const validTagNames = new Set(state.tags.map(t => t.name));
-    state.activeTags = state.activeTags.filter(name => validTagNames.has(name));
-    if (state.rightFilterTag && !validTagNames.has(state.rightFilterTag)) {
-      state.rightFilterTag = '';
-    }
-    
-    renderSidebarTags();
-    renderFilterChips();
-    populateRightTagPicker();
-  } catch (e) {}
-}
-
-function populateRightTagPicker() {
-  if (!DOM.rightTagPicker) return;
-  const currentVal = DOM.rightTagPicker.value;
-  DOM.rightTagPicker.innerHTML = `<option value="">${t('allTagsFilterOption')}</option>`;
-  state.tags.forEach(t => {
-    const opt = document.createElement('option');
-    opt.value = t.name;
-    opt.textContent = `#${t.name} (${t.track_count})`;
-    if (t.name === currentVal) opt.selected = true;
-    DOM.rightTagPicker.appendChild(opt);
-  });
-}
-
-function renderSidebarTags() {
-  DOM.tagsList.innerHTML = '';
-  state.tags.forEach((tag, idx) => {
-    const pill = document.createElement('div');
-    pill.className = `tag-pill ${state.activeTags.includes(tag.name) ? 'active' : ''}`;
-    pill.dataset.tag = tag.name;
-    pill.dataset.index = idx;
-    pill.draggable = true;
-
-    // Bi-directional Drag & Drop: Drag Tag onto Songs OR Drag-to-reorder tags
-    pill.addEventListener('dragstart', (e) => {
-      e.dataTransfer.effectAllowed = 'copyMove';
-      e.dataTransfer.setData('application/json', JSON.stringify({
-        type: 'tag',
-        tagName: tag.name,
-        tagColor: tag.color,
-        index: idx
-      }));
-      pill.classList.add('dragging');
-    });
-
-    pill.addEventListener('dragend', () => {
-      pill.classList.remove('dragging');
-      document.querySelectorAll('.tag-pill').forEach(p => p.style.borderColor = '');
-      document.querySelectorAll('.track-row').forEach(r => r.classList.remove('drop-target-tag'));
-    });
-
-    pill.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      pill.style.borderColor = tag.color;
-      pill.style.transform = 'scale(1.06)';
-    });
-
-    pill.addEventListener('dragleave', () => {
-      pill.style.borderColor = '';
-      pill.style.transform = '';
-    });
-
-    pill.addEventListener('drop', async (e) => {
-      e.preventDefault();
-      pill.style.borderColor = '';
-      pill.style.transform = '';
-
-      try {
-        const raw = e.dataTransfer.getData('application/json');
-        const data = raw ? JSON.parse(raw) : null;
-
-        if (data && data.type === 'tag') {
-          const fromIdx = data.index;
-          const toIdx = idx;
-          if (fromIdx !== toIdx) {
-            const movedTag = state.tags.splice(fromIdx, 1)[0];
-            state.tags.splice(toIdx, 0, movedTag);
-            renderSidebarTags();
-            await api('/api/tags/reorder', {
-              method: 'POST',
-              body: JSON.stringify({ tag_names: state.tags.map(t => t.name) })
-            });
-            showToast(`🏷️ Reordered tags`);
-          }
-          return;
-        }
-
-        // Dropping songs onto this tag!
-        let trackIdsToTag = [];
-        if (data && data.tracks && Array.isArray(data.tracks)) {
-          trackIdsToTag = data.tracks.map(t => t.id).filter(Boolean);
-        }
-
-        if (trackIdsToTag.length === 0 && typeof draggedTrackData !== 'undefined' && draggedTrackData.length > 0) {
-          trackIdsToTag = draggedTrackData.map(t => t.id).filter(Boolean);
-        }
-        if (trackIdsToTag.length === 0 && state.selectedIds.size > 0) {
-          trackIdsToTag = Array.from(state.selectedIds);
-        }
-
-        if (trackIdsToTag.length > 0) {
-          await api('/api/tags/assign', {
-            method: 'POST',
-            body: JSON.stringify({ track_ids: trackIdsToTag, tag_names: [tag.name] })
-          });
-          showToast(`🏷️ Tagged ${trackIdsToTag.length} song${trackIdsToTag.length === 1 ? '' : 's'} with #${tag.name}`);
-          state.selectedIds.clear();
-          updateSelectionUI();
-          await loadTags();
-          await loadTracks();
-        }
-      } catch (err) {
-        console.error('Tag drop error:', err);
-      }
-    });
-
-    // Right-Click Context Menu on Tag Pill (Rename, Change Color, Delete)
-    pill.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      openTagContextMenu(e.clientX, e.clientY, tag);
-    });
-
-    pill.innerHTML = `
-      <span class="tag-dot" style="background-color: ${tag.color}"></span>
-      <span class="tag-name">#${escapeHtml(tag.name)}</span>
-      <span class="tag-count">(${tag.track_count})</span>
-    `;
-
-    pill.addEventListener('click', () => toggleTagFilter(tag.name));
-    DOM.tagsList.appendChild(pill);
-  });
-}
-
-function openTagContextMenu(x, y, tag) {
-  activeContextMenuTag = tag;
-  hideAllContextMenus();
-  const menu = DOM.tagContextMenu;
-  menu.style.left = `${Math.min(x, window.innerWidth - 190)}px`;
-  menu.style.top = `${Math.min(y, window.innerHeight - 180)}px`;
-  menu.classList.remove('hidden');
-}
-
 function openPlaylistContextMenu(x, y, playlist) {
   activeContextMenuPlaylist = playlist;
   hideAllContextMenus();
@@ -1738,27 +1424,14 @@ function openPlaylistContextMenu(x, y, playlist) {
 }
 
 // --- Interactive Confirmation & Rename Modal ---
-function showConfirmModal({ title, message, showInput = false, inputValue = '', inputLabel = 'Name:', showColor = false, colorValue = '#1DB954', confirmText = 'Confirm', onConfirm }) {
+function showConfirmModal({ title, message, showInput = false, inputValue = '', inputLabel = 'Name:', confirmText = 'Confirm', onConfirm }) {
   DOM.confirmModalTitle.textContent = title;
   DOM.confirmModalMessage.textContent = message || '';
   
-  if (showInput || showColor) {
+  if (showInput) {
     DOM.confirmModalInputGroup.classList.remove('hidden');
     DOM.confirmModalInputLabel.textContent = inputLabel;
-    
-    if (showInput) {
-      DOM.confirmModalInput.classList.remove('hidden');
-      DOM.confirmModalInput.value = inputValue;
-    } else {
-      DOM.confirmModalInput.classList.add('hidden');
-    }
-    
-    if (showColor) {
-      DOM.confirmModalColorInput.classList.remove('hidden');
-      DOM.confirmModalColorInput.value = colorValue;
-    } else {
-      DOM.confirmModalColorInput.classList.add('hidden');
-    }
+    DOM.confirmModalInput.value = inputValue;
   } else {
     DOM.confirmModalInputGroup.classList.add('hidden');
   }
@@ -1769,51 +1442,6 @@ function showConfirmModal({ title, message, showInput = false, inputValue = '', 
   if (showInput) DOM.confirmModalInput.focus();
 }
 
-function toggleTagFilter(tagName) {
-  if (state.activeTags.includes(tagName)) {
-    state.activeTags = state.activeTags.filter(t => t !== tagName);
-  } else {
-    state.activeTags.push(tagName);
-  }
-  renderSidebarTags();
-  renderFilterChips();
-  loadTracks();
-}
-
-function renderFilterChips() {
-  DOM.activeFilterChips.innerHTML = '';
-  if (state.activeTags.length === 0) return;
-
-  state.activeTags.forEach((tagName, idx) => {
-    const chip = document.createElement('div');
-    chip.className = 'filter-chip';
-    chip.innerHTML = `#${escapeHtml(tagName)} <span>✕</span>`;
-    chip.addEventListener('click', () => toggleTagFilter(tagName));
-    DOM.activeFilterChips.appendChild(chip);
-
-    if (idx < state.activeTags.length - 1) {
-      const modeSpan = document.createElement('span');
-      modeSpan.style.fontSize = '11px';
-      modeSpan.style.color = '#888';
-      modeSpan.textContent = state.filterMode;
-      DOM.activeFilterChips.appendChild(modeSpan);
-    }
-  });
-
-  const clearBtn = document.createElement('button');
-  clearBtn.className = 'btn btn-ghost btn-sm';
-  clearBtn.style.padding = '1px 6px';
-  clearBtn.style.fontSize = '10px';
-  clearBtn.textContent = 'Clear Filter ✕';
-  clearBtn.addEventListener('click', () => {
-    state.activeTags = [];
-    renderSidebarTags();
-    renderFilterChips();
-    loadTracks();
-  });
-  DOM.activeFilterChips.appendChild(clearBtn);
-}
-
 // --- Playlists Operations ---
 async function loadPlaylists() {
   try {
@@ -1821,6 +1449,15 @@ async function loadPlaylists() {
     state.allPlaylists = data.playlists || [];
     DOM.playlistsList.innerHTML = '';
     
+    // Update Liked Songs count from the liked_songs playlist record
+    const likedPl = state.allPlaylists.find(p => p.id === 'liked_songs');
+    if (likedPl) {
+      const countLiked = document.getElementById('count-liked');
+      if (countLiked) {
+        countLiked.textContent = likedPl.total_tracks || (likedPl.track_ids ? likedPl.track_ids.length : 0);
+      }
+    }
+
     if (DOM.rightPlaylistPicker) {
       DOM.rightPlaylistPicker.innerHTML = `<option value="">${t('selectPlaylistOption')}</option>`;
     }
@@ -1870,17 +1507,10 @@ async function loadTracks() {
     let url = '/api/tracks?';
     const params = new URLSearchParams();
     
-    if (state.activeView === 'untagged') {
-      params.append('untagged_only', 'true');
-    } else if (state.activeView === 'liked_songs') {
+    if (state.activeView === 'liked_songs') {
       params.append('playlist_id', 'liked_songs');
     } else if (state.activeView !== 'all') {
       params.append('playlist_id', state.activeView);
-    }
-
-    if (state.activeTags.length > 0) {
-      params.append('tags', state.activeTags.join(','));
-      params.append('filter_mode', state.filterMode);
     }
 
     if (state.searchQuery.trim()) {
@@ -1916,18 +1546,13 @@ function updateCounts(count) {
   if (headingEl) {
     let viewName = t('likedSongs');
     if (state.activeView === 'all') viewName = t('allTracks');
-    else if (state.activeView === 'untagged') viewName = t('untaggedSongs');
     else {
       const pl = state.allPlaylists.find(p => p.id === state.activeView);
       if (pl) viewName = pl.name;
     }
 
     const queuePrefix = isEs ? 'Cola activa' : 'Active Queue';
-    if (state.activeTags.length > 0) {
-      headingEl.textContent = `${queuePrefix}: ${state.activeTags.map(t => '#' + t).join(' ' + state.filterMode + ' ')}`;
-    } else {
-      headingEl.textContent = `${queuePrefix}: ${viewName}`;
-    }
+    headingEl.textContent = `${queuePrefix}: ${viewName}`;
   }
 
   if (subtextEl) {
@@ -1936,19 +1561,15 @@ function updateCounts(count) {
 
   const countLiked = document.getElementById('count-liked');
   const countAll = document.getElementById('count-all');
-  const countUntagged = document.getElementById('count-untagged');
-  if (countLiked && state.activeView === 'liked_songs' && state.activeTags.length === 0 && !state.searchQuery) {
+  if (countLiked && state.activeView === 'liked_songs' && !state.searchQuery) {
     countLiked.textContent = count;
   }
-  if (countAll && state.activeView === 'all' && state.activeTags.length === 0 && !state.searchQuery) {
+  if (countAll && state.activeView === 'all' && !state.searchQuery) {
     countAll.textContent = count;
-  }
-  if (countUntagged && state.activeView === 'untagged' && state.activeTags.length === 0 && !state.searchQuery) {
-    countUntagged.textContent = count;
   }
 }
 
-// --- Render Table: Check | Num | Title | Artist | Tags | Album | Dur ---
+// --- Render Table: Check | Num | Title | Artist | Album | Dur ---
 function renderTracksTable() {
   DOM.tracksTbody.innerHTML = '';
   
@@ -2046,28 +1667,13 @@ function renderTracksTable() {
     tdArtist.innerHTML = `<span class="track-artist">${escapeHtml(track.artist)}</span>`;
     tr.appendChild(tdArtist);
 
-    // Col 5: Tags (AFTER ARTIST as requested!)
-    const tdTags = document.createElement('td');
-    tdTags.className = 'col-tags';
-    const tagWrap = document.createElement('div');
-    tagWrap.className = 'row-tags-wrapper';
-    (track.tags || []).forEach(t => {
-      const badge = document.createElement('span');
-      badge.className = 'mini-tag-badge';
-      badge.style.backgroundColor = t.color || '#1DB954';
-      badge.textContent = `#${t.name}`;
-      tagWrap.appendChild(badge);
-    });
-    tdTags.appendChild(tagWrap);
-    tr.appendChild(tdTags);
-
-    // Col 6: Album
+    // Col 5: Album
     const tdAlbum = document.createElement('td');
     tdAlbum.className = 'col-album';
     tdAlbum.innerHTML = `<span class="track-album">${escapeHtml(track.album)}</span>`;
     tr.appendChild(tdAlbum);
 
-    // Col 7: Duration
+    // Col 6: Duration
     const tdDur = document.createElement('td');
     tdDur.className = 'col-duration';
     tdDur.textContent = formatDuration(track.duration_ms);
@@ -2332,16 +1938,13 @@ function attachDragAndDropHandlers(tr, trackId, index) {
   tr.addEventListener('dragend', () => {
     tr.classList.remove('dragging');
     document.querySelectorAll('.track-row').forEach(r => {
-      r.classList.remove('drop-target-above', 'drop-target-below', 'drop-target-tag');
+      r.classList.remove('drop-target-above', 'drop-target-below');
     });
   });
 
   tr.addEventListener('dragover', (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
-
-    // Highlight row if dragging a tag
-    tr.classList.add('drop-target-tag');
 
     const rect = tr.getBoundingClientRect();
     const relY = e.clientY - rect.top;
@@ -2357,12 +1960,12 @@ function attachDragAndDropHandlers(tr, trackId, index) {
   });
 
   tr.addEventListener('dragleave', () => {
-    tr.classList.remove('drop-target-above', 'drop-target-below', 'drop-target-tag');
+    tr.classList.remove('drop-target-above', 'drop-target-below');
   });
 
   tr.addEventListener('drop', async (e) => {
     e.preventDefault();
-    tr.classList.remove('drop-target-above', 'drop-target-below', 'drop-target-tag');
+    tr.classList.remove('drop-target-above', 'drop-target-below');
 
     try {
       let payload = null;
@@ -2374,37 +1977,14 @@ function attachDragAndDropHandlers(tr, trackId, index) {
       if (!payload && window.__draggedTracksFromRight) {
         payload = { source: 'right', tracks: window.__draggedTracksFromRight };
       }
-      
-      // Case 1: Tag dropped onto this track row!
-      if (payload && payload.type === 'tag') {
-        let targetTrackIds = [];
-        if (state.selectedIds.has(trackId)) {
-          targetTrackIds = Array.from(state.selectedIds);
-        } else {
-          targetTrackIds = [trackId];
-        }
 
-        if (targetTrackIds.length > 0) {
-          await api('/api/tags/assign', {
-            method: 'POST',
-            body: JSON.stringify({ track_ids: targetTrackIds, tag_names: [payload.tagName] })
-          });
-          showToast(`🏷️ Tagged ${targetTrackIds.length} song${targetTrackIds.length === 1 ? '' : 's'} with #${payload.tagName}`);
-          state.selectedIds.clear();
-          updateSelectionUI();
-          await loadTags();
-          await loadTracks();
-        }
-        return;
-      }
-
-      // Case 2: Songs dropped from right browser / Discovery studio
+      // Case 1: Songs dropped from right browser / Discovery studio
       if (payload && payload.source === 'right' && payload.tracks && payload.tracks.length > 0) {
         insertTracksIntoMainPanel(payload.tracks, index);
         return;
       }
 
-      // Case 3: Reordering main list
+      // Case 2: Reordering main list
       if (payload && payload.tracks && payload.source === 'main') {
         const movedIds = payload.tracks.map(t => t.id);
         executeReorder(movedIds, index);
@@ -2650,7 +2230,6 @@ function initRightPanel() {
     DOM.rightSearchControls.classList.remove('hidden');
     DOM.rightPlaylistControls.classList.add('hidden');
     DOM.rightDiscoveryControls?.classList.add('hidden');
-    DOM.rightTagFilterBar?.classList.add('hidden');
     DOM.rightStandardActionHeader?.classList.remove('hidden');
     DOM.rightItemsContainer?.classList.remove('hidden');
     DOM.rightSearchInput.focus();
@@ -2662,7 +2241,6 @@ function initRightPanel() {
     DOM.tabRightSearch.classList.remove('active');
     DOM.tabRightDiscovery?.classList.remove('active');
     DOM.rightPlaylistControls.classList.remove('hidden');
-    DOM.rightTagFilterBar?.classList.remove('hidden');
     DOM.rightSearchControls.classList.add('hidden');
     DOM.rightDiscoveryControls?.classList.add('hidden');
     DOM.rightStandardActionHeader?.classList.remove('hidden');
@@ -2680,7 +2258,6 @@ function initRightPanel() {
     DOM.rightDiscoveryControls?.classList.remove('hidden');
     DOM.rightSearchControls.classList.add('hidden');
     DOM.rightPlaylistControls.classList.add('hidden');
-    DOM.rightTagFilterBar?.classList.add('hidden');
     DOM.rightStandardActionHeader?.classList.add('hidden');
     DOM.rightItemsContainer?.classList.add('hidden');
 
@@ -2735,16 +2312,6 @@ function initRightPanel() {
     }
   });
 
-  // Right Tag filter dropdown
-  DOM.rightTagPicker?.addEventListener('change', (e) => {
-    state.rightFilterTag = e.target.value;
-    if (state.rightTab === 'playlist' && DOM.rightPlaylistPicker.value) {
-      loadRightPlaylistTracks(DOM.rightPlaylistPicker.value);
-    } else if (state.rightFilterTag) {
-      loadTracksByTagRightPanel(state.rightFilterTag);
-    }
-  });
-
   DOM.rightAddSelectedBtn?.addEventListener('click', () => {
     const selectedTracks = state.rightTracks.filter(t => state.rightSelectedIds.has(t.id));
     if (selectedTracks.length > 0) {
@@ -2786,25 +2353,10 @@ async function loadRightPlaylistTracks(playlistId) {
   DOM.rightItemsContainer.innerHTML = '<div class="search-placeholder-text">Loading playlist songs...</div>';
   try {
     const data = await api(`/api/tracks?playlist_id=${playlistId}`);
-    let results = data.tracks || [];
-    if (state.rightFilterTag) {
-      results = results.filter(t => (t.tags || []).some(tag => tag.name === state.rightFilterTag));
-    }
-    state.rightTracks = results;
-    renderRightItems();
-  } catch (e) {
-    DOM.rightItemsContainer.innerHTML = '<div class="search-placeholder-text">Error loading playlist.</div>';
-  }
-}
-
-async function loadTracksByTagRightPanel(tagName) {
-  DOM.rightItemsContainer.innerHTML = `<div class="search-placeholder-text">Loading #${tagName} songs...</div>`;
-  try {
-    const data = await api(`/api/tracks?tags=${encodeURIComponent(tagName)}`);
     state.rightTracks = data.tracks || [];
     renderRightItems();
   } catch (e) {
-    DOM.rightItemsContainer.innerHTML = '<div class="search-placeholder-text">Error loading tagged songs.</div>';
+    DOM.rightItemsContainer.innerHTML = '<div class="search-placeholder-text">Error loading playlist.</div>';
   }
 }
 
@@ -2830,19 +2382,12 @@ function renderRightItems() {
       ? `<img class="track-album-art" style="width:24px;height:24px;" src="${track.album_art_url}" alt="" loading="lazy">`
       : `<div class="track-album-art-placeholder" style="width:24px;height:24px;font-size:10px;">🎵</div>`;
 
-    // Tags list for right panel
-    let tagsHtml = '';
-    if (track.tags && track.tags.length > 0) {
-      tagsHtml = track.tags.map(t => `<span class="mini-tag-badge" style="background-color:${t.color || '#1DB954'}">#${t.name}</span>`).join('');
-    }
-
     row.innerHTML = `
       ${imgHtml}
       <div class="right-item-meta">
         <div class="right-item-title">${escapeHtml(track.title)}</div>
         <div class="right-item-subtitle-row">
           <span class="right-item-artist">${escapeHtml(track.artist)}</span>
-          <div class="right-item-tags">${tagsHtml}</div>
         </div>
       </div>
       <span class="right-item-dur">${formatDuration(track.duration_ms)}</span>
@@ -3519,15 +3064,6 @@ function renderDiscoveryResultsItems(tracks) {
       ? `<img class="track-album-art" style="width:24px;height:24px;border-radius:3px;object-fit:cover;" src="${track.album_art_url}" alt="" loading="lazy">`
       : `<div class="track-album-art-placeholder" style="width:24px;height:24px;font-size:10px;">🎵</div>`;
 
-    // Tags list for discovery panel
-    let tagsHtml = '';
-    if (track.tags && track.tags.length > 0) {
-      tagsHtml = track.tags.map(t => `<span class="mini-tag-badge" style="background-color:${t.color || '#1DB954'}">${escapeHtml(t.name)}</span>`).join('');
-    }
-
-    row.appendChild(chk);
-    row.appendChild(playBtn);
-
     const metaWrap = document.createElement('div');
     metaWrap.className = 'right-item-meta';
     metaWrap.style.flex = '1';
@@ -3539,7 +3075,6 @@ function renderDiscoveryResultsItems(tracks) {
           <div class="right-item-title" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(track.title)}</div>
           <div class="right-item-subtitle-row">
             <span class="right-item-artist" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(track.artist)}</span>
-            <div class="right-item-tags">${tagsHtml}</div>
           </div>
         </div>
       </div>
@@ -3767,12 +3302,7 @@ function openCreatePlaylistModal(fromActiveList = false) {
     DOM.createPlaylistCountHint.textContent = isEs
       ? `Creará o sobrescribirá una playlist con las ${count} canciones de tu lista activa en su orden actual.`
       : `Will create or overwrite a playlist containing ${count} songs from your active list in their current order.`;
-    
-    if (state.activeTags && state.activeTags.length > 0) {
-      DOM.newPlaylistName.value = `Kiki's #${state.activeTags.join(' #')} Mix`;
-    } else {
-      DOM.newPlaylistName.value = `Kiki's Mix ${new Date().toLocaleDateString()}`;
-    }
+    DOM.newPlaylistName.value = `Kiki's Mix ${new Date().toLocaleDateString()}`;
   } else {
     count = state.selectedIds.size;
     const isEs = state.currentLang === 'es';
@@ -3863,74 +3393,6 @@ async function executePlaylistSave(name, desc, trackIds, overwrite = false, play
   }
 }
 
-// --- Tag Assignment Modal ---
-function openTagModal() {
-  DOM.modalTagsChecklist.innerHTML = '';
-  const selectedTrackObjects = state.tracks.filter(t => state.selectedIds.has(t.id));
-  const totalSelected = selectedTrackObjects.length;
-
-  state.tags.forEach(tag => {
-    const countWithTag = selectedTrackObjects.filter(t => 
-      (t.tags || []).some(tt => tt.name === tag.name)
-    ).length;
-
-    const row = document.createElement('div');
-    row.className = 'modal-tag-row';
-    const chk = document.createElement('input');
-    chk.type = 'checkbox';
-    chk.value = tag.name;
-
-    if (countWithTag === totalSelected && totalSelected > 0) {
-      chk.checked = true;
-    } else if (countWithTag > 0) {
-      chk.indeterminate = true;
-    }
-
-    row.innerHTML = `
-      <span class="tag-dot" style="background-color: ${tag.color}"></span>
-      <span style="flex:1; font-size:12px; font-weight:500;">#${escapeHtml(tag.name)}</span>
-      <span style="font-size:11px; color:#888;">(${countWithTag}/${totalSelected})</span>
-    `;
-    row.prepend(chk);
-    DOM.modalTagsChecklist.appendChild(row);
-  });
-
-  DOM.tagModal.classList.remove('hidden');
-  DOM.newTagNameInput.focus();
-}
-
-async function applyTagModalChanges() {
-  const selectedTrackIds = Array.from(state.selectedIds);
-  if (selectedTrackIds.length === 0) return;
-
-  const toAdd = [];
-  const toRemove = [];
-
-  const checkboxes = DOM.modalTagsChecklist.querySelectorAll('input[type="checkbox"]');
-  checkboxes.forEach(chk => {
-    if (chk.checked) toAdd.push(chk.value);
-    else if (!chk.indeterminate) toRemove.push(chk.value);
-  });
-
-  if (toAdd.length > 0) {
-    await api('/api/tags/assign', {
-      method: 'POST',
-      body: JSON.stringify({ track_ids: selectedTrackIds, tag_names: toAdd })
-    });
-  }
-  if (toRemove.length > 0) {
-    await api('/api/tags/remove', {
-      method: 'POST',
-      body: JSON.stringify({ track_ids: selectedTrackIds, tag_names: toRemove })
-    });
-  }
-
-  showToast(`✅ Updated tags for ${selectedTrackIds.length} tracks`);
-  DOM.tagModal.classList.add('hidden');
-  await loadTags();
-  await loadTracks();
-}
-
 // --- Context Menu for Tracks ---
 let contextMenuIndex = 0;
 function openContextMenu(x, y, index) {
@@ -3944,7 +3406,6 @@ function openContextMenu(x, y, index) {
 
 function hideAllContextMenus() {
   DOM.customContextMenu?.classList.add('hidden');
-  DOM.tagContextMenu?.classList.add('hidden');
   DOM.playlistContextMenu?.classList.add('hidden');
 }
 
@@ -4000,14 +3461,6 @@ function initEventListeners() {
     });
   });
 
-  DOM.filterModeRadios?.forEach(radio => {
-    radio.addEventListener('change', (e) => {
-      state.filterMode = e.target.value;
-      renderFilterChips();
-      loadTracks();
-    });
-  });
-
   DOM.selectAllCheckbox?.addEventListener('change', (e) => {
     if (e.target.checked) {
       state.tracks.forEach(t => state.selectedIds.add(t.id));
@@ -4054,18 +3507,6 @@ function initEventListeners() {
 
   // Batch Action Bar
   DOM.batchCreatePlaylistBtn?.addEventListener('click', () => openCreatePlaylistModal(false));
-  DOM.batchTagBtn?.addEventListener('click', openTagModal);
-  DOM.batchRemoveTagsBtn?.addEventListener('click', async () => {
-    const ids = Array.from(state.selectedIds);
-    const allTagNames = state.tags.map(t => t.name);
-    await api('/api/tags/remove', {
-      method: 'POST',
-      body: JSON.stringify({ track_ids: ids, tag_names: allTagNames })
-    });
-    showToast(`❌ Removed tags from ${ids.length} tracks`);
-    await loadTags();
-    await loadTracks();
-  });
 
   DOM.batchShuffleBtn?.addEventListener('click', () => {
     if (state.isOrderLocked) {
@@ -4126,106 +3567,6 @@ function initEventListeners() {
   DOM.closeCreatePlaylistModal?.addEventListener('click', () => DOM.createPlaylistModal.classList.add('hidden'));
   DOM.cancelCreatePlaylistModal?.addEventListener('click', () => DOM.createPlaylistModal.classList.add('hidden'));
   DOM.confirmCreatePlaylistModal?.addEventListener('click', handleCreateSpotifyPlaylist);
-
-  DOM.closeTagModal?.addEventListener('click', () => DOM.tagModal.classList.add('hidden'));
-  DOM.cancelTagModal?.addEventListener('click', () => DOM.tagModal.classList.add('hidden'));
-  DOM.applyTagModal?.addEventListener('click', applyTagModalChanges);
-
-  DOM.createTagSidebarBtn?.addEventListener('click', openTagModal);
-  DOM.createTagSubmitBtn?.addEventListener('click', async () => {
-    const name = DOM.newTagNameInput.value.trim();
-    const color = DOM.newTagColorInput.value;
-    if (name) {
-      if (state.tags.some(t => t.name.toLowerCase() === name.toLowerCase())) {
-        showToast(`Tag #${name} already exists`, 'error');
-        return;
-      }
-      await api('/api/tags', { method: 'POST', body: JSON.stringify({ name, color }) });
-      DOM.newTagNameInput.value = '';
-      showToast(`🏷️ Created tag #${name}`);
-      await loadTags();
-      openTagModal();
-    }
-  });
-
-  // Tag Context Menu Actions (Rename, Change Color, Delete) with Confirmation Dialog
-  document.getElementById('ctx-tag-rename')?.addEventListener('click', () => {
-    if (!activeContextMenuTag) return;
-    const tag = activeContextMenuTag;
-    showConfirmModal({
-      title: `✏️ Rename Tag #${tag.name}`,
-      message: `Enter the new name for tag #${tag.name}:`,
-      showInput: true,
-      inputValue: tag.name,
-      inputLabel: 'New Tag Name:',
-      confirmText: 'Rename Tag',
-      onConfirm: async () => {
-        const newName = DOM.confirmModalInput.value.trim();
-        if (newName && newName !== tag.name) {
-          try {
-            await api('/api/tags/rename', {
-              method: 'POST',
-              body: JSON.stringify({ old_name: tag.name, new_name: newName })
-            });
-            showToast(`✏️ Renamed tag to #${newName}`);
-            DOM.confirmModal.classList.add('hidden');
-            await loadTags();
-            await loadTracks();
-          } catch (e) {
-            showToast(e.message, 'error');
-          }
-        }
-      }
-    });
-  });
-
-  document.getElementById('ctx-tag-color')?.addEventListener('click', () => {
-    if (!activeContextMenuTag) return;
-    const tag = activeContextMenuTag;
-    showConfirmModal({
-      title: `🎨 Change Color for #${tag.name}`,
-      message: `Pick a new badge color for #${tag.name}:`,
-      showColor: true,
-      colorValue: tag.color || '#1DB954',
-      confirmText: 'Save Color',
-      onConfirm: async () => {
-        const newColor = DOM.confirmModalColorInput.value;
-        try {
-          await api('/api/tags', {
-            method: 'POST',
-            body: JSON.stringify({ name: tag.name, color: newColor })
-          });
-          showToast(`🎨 Updated color for #${tag.name}`);
-          DOM.confirmModal.classList.add('hidden');
-          await loadTags();
-          await loadTracks();
-        } catch (e) {
-          showToast(e.message, 'error');
-        }
-      }
-    });
-  });
-
-  document.getElementById('ctx-tag-delete')?.addEventListener('click', () => {
-    if (!activeContextMenuTag) return;
-    const tag = activeContextMenuTag;
-    showConfirmModal({
-      title: `🗑️ Delete Tag #${tag.name}`,
-      message: `Are you sure you want to delete tag #${tag.name}? This will remove it from all tracks.`,
-      confirmText: 'Yes, Delete Tag',
-      onConfirm: async () => {
-        try {
-          await api(`/api/tags?name=${encodeURIComponent(tag.name)}`, { method: 'DELETE' });
-          showToast(`🗑️ Deleted tag #${tag.name}`);
-          DOM.confirmModal.classList.add('hidden');
-          await loadTags();
-          await loadTracks();
-        } catch (e) {
-          showToast(e.message, 'error');
-        }
-      }
-    });
-  });
 
   // Playlist Context Menu Actions (Rename, Delete)
   document.getElementById('ctx-playlist-rename')?.addEventListener('click', () => {
@@ -4324,8 +3665,6 @@ function initEventListeners() {
           DOM.settingsModal.classList.add('hidden');
           state.authenticated = false;
           state.tracks = [];
-          state.tags = [];
-          state.activeTags = [];
           state.allPlaylists = [];
           await checkStatus();
         } catch (e) {
@@ -4355,18 +3694,6 @@ function initEventListeners() {
   document.getElementById('ctx-play-now')?.addEventListener('click', () => playFromIndex(contextMenuIndex));
   document.getElementById('ctx-true-shuffle')?.addEventListener('click', toggleTrueShuffle);
   document.getElementById('ctx-make-playlist')?.addEventListener('click', () => openCreatePlaylistModal(false));
-  document.getElementById('ctx-assign-tags')?.addEventListener('click', openTagModal);
-  document.getElementById('ctx-remove-tags')?.addEventListener('click', async () => {
-    const ids = Array.from(state.selectedIds);
-    const allTagNames = state.tags.map(t => t.name);
-    await api('/api/tags/remove', {
-      method: 'POST',
-      body: JSON.stringify({ track_ids: ids, tag_names: allTagNames })
-    });
-    showToast(`❌ Removed tags from ${ids.length} tracks`);
-    await loadTags();
-    await loadTracks();
-  });
   document.getElementById('ctx-remove-from-list')?.addEventListener('click', handleRemoveSelectedFromList);
   document.getElementById('ctx-keep-only-selected')?.addEventListener('click', handleKeepOnlySelectedInList);
 
@@ -4380,7 +3707,6 @@ function initEventListeners() {
     } else if (e.key === 'Escape') {
       state.selectedIds.clear();
       updateSelectionUI();
-      DOM.tagModal?.classList.add('hidden');
       DOM.settingsModal?.classList.add('hidden');
       DOM.createPlaylistModal?.classList.add('hidden');
       DOM.confirmModal?.classList.add('hidden');
@@ -4392,9 +3718,6 @@ function initEventListeners() {
     } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
       e.preventDefault();
       handleUndo();
-    } else if (e.key.toLowerCase() === 't' && state.selectedIds.size > 0) {
-      e.preventDefault();
-      openTagModal();
     } else if (e.key === '/') {
       e.preventDefault();
       DOM.searchInput?.focus();
