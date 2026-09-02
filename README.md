@@ -1,6 +1,6 @@
 # <img src="Icon.jpeg" width="36" height="36" style="vertical-align: middle; border-radius: 8px;" alt="App Icon" /> Kiki's Spotify Mixer for Mac
 
-> **🤖 Built with AI**: Conceived and designed by **Quio**, coded and assembled using AI with **Google Antigravity**.
+> **💡 Project Credits**: Conceived by **Quio**, designed collaboratively, and coded & assembled using AI with **Google Antigravity**.
 
 A lightweight, powerful Spotify controller and library manager tailored for **macOS**. It provides **true mathematical random shuffle (Fisher-Yates)**, a **multi-label tagging system with boolean filtering and bulk management**, **drag-and-drop reordering with auto-scroll**, a **live contextual tracklist view**, and **offline AppleScript local control**.
 
