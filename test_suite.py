@@ -207,6 +207,20 @@ class TestSpotifySmartController(unittest.TestCase):
         non_remix = [t for t in raw_candidates if not sp_client.is_remix_track(t["title"], t["album"])]
         self.assertNotIn("cand3", [t["id"] for t in non_remix])
         
+        # Test 3: ONLY Live and ONLY Remix filters
+        only_live = [t for t in raw_candidates if sp_client.is_live_track(t["title"], t["album"])]
+        self.assertEqual([t["id"] for t in only_live], ["cand2"])
+
+        only_remix = [t for t in raw_candidates if sp_client.is_remix_track(t["title"], t["album"])]
+        self.assertEqual([t["id"] for t in only_remix], ["cand3"])
+
+        # Test 4: Hidden Gems popularity filtering
+        raw_candidates[3]["popularity"] = 25  # cand4 is a hidden gem
+        raw_candidates[0]["popularity"] = 85  # cand1 is a mainstream hit
+        gems = [t for t in raw_candidates if (t.get("popularity") or 0) <= 42]
+        self.assertIn("cand4", [t["id"] for t in gems])
+        self.assertNotIn("cand1", [t["id"] for t in gems])
+
         # Combined strict filters should leave ONLY cand4 (when excluding cand1 artist)
         clean = [
             t for t in raw_candidates

@@ -4,7 +4,7 @@ set -e
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$DIR"
 
-VERSION="0.0.1"
+VERSION="0.1.0"
 DMG_NAME="Kikis_Spotify_Mixer_v${VERSION}.dmg"
 APP_NAME="Kiki's Spotify Mixer.app"
 STAGING_DIR="$DIR/.dmg_staging"

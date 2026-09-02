@@ -97,6 +97,8 @@ class DiscoveryMatrixRequest(BaseModel):
     not_recently_played_days: Optional[int] = 30
     not_live: Optional[bool] = False
     not_remix: Optional[bool] = False
+    only_live: Optional[bool] = False
+    only_remix: Optional[bool] = False
     low_popularity_only: Optional[bool] = False
     hidden_gem_target: Optional[str] = "artist"
     target_count: Optional[int] = 30
@@ -528,6 +530,8 @@ def generate_discovery_mix(req: DiscoveryMatrixRequest):
         not_recently_played_days=req.not_recently_played_days,
         not_live=bool(req.not_live),
         not_remix=bool(req.not_remix),
+        only_live=bool(req.only_live),
+        only_remix=bool(req.only_remix),
         low_popularity_only=bool(req.low_popularity_only),
         hidden_gem_target=req.hidden_gem_target or "artist",
         target_count=req.target_count or 30,

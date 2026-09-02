@@ -373,15 +373,42 @@
                 </label>
               </div>
             </div>
-            <div class="switches-dual-row">
-              <label class="switch-row" data-tooltip-title="NOT Live" data-tooltip="Filters out concert recordings, live albums, and en vivo tracks.">
-                <input type="checkbox" id="disc-not-live" checked>
-                <span class="switch-label">NOT Live</span>
-              </label>
-              <label class="switch-row" data-tooltip-title="NOT Remix" data-tooltip="Filters out club edits, remixes, VIP mixes, and dub edits.">
-                <input type="checkbox" id="disc-not-remix" checked>
-                <span class="switch-label">NOT Remix</span>
-              </label>
+            <!-- Live Versions Mode (Mutually Exclusive NOT vs ONLY vs ALL) -->
+            <div class="discovery-sub-block" style="margin-top: 6px;">
+              <div class="discovery-sub-label" id="disc-live-mode-title">🎤 Versiones En Vivo:</div>
+              <div class="radio-pill-group recent-pill-group">
+                <label class="radio-pill" data-tooltip-title="Sin En Vivo" data-tooltip="Excluye grabaciones en vivo, recitales, acústicos y temas en directo.">
+                  <input type="radio" name="disc-live-mode" value="not_live" checked>
+                  <span id="disc-live-not-label">🚫 Sin En Vivo</span>
+                </label>
+                <label class="radio-pill" data-tooltip-title="Todas" data-tooltip="Permite tanto canciones de estudio como versiones en vivo.">
+                  <input type="radio" name="disc-live-mode" value="any">
+                  <span id="disc-live-any-label">Todas</span>
+                </label>
+                <label class="radio-pill" data-tooltip-title="Solo En Vivo" data-tooltip="Busca y filtra exclusivamente versiones en vivo, recitales y acústicos en directo.">
+                  <input type="radio" name="disc-live-mode" value="only_live">
+                  <span id="disc-live-only-label">🎤 Solo En Vivo</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Remix & Remaster Mode (Mutually Exclusive NOT vs ONLY vs ALL) -->
+            <div class="discovery-sub-block" style="margin-top: 6px;">
+              <div class="discovery-sub-label" id="disc-remix-mode-title">🎛️ Remix / Remaster:</div>
+              <div class="radio-pill-group recent-pill-group">
+                <label class="radio-pill" data-tooltip-title="Sin Remix" data-tooltip="Excluye versiones remix, club mix, VIP edits y remasterizaciones.">
+                  <input type="radio" name="disc-remix-mode" value="not_remix" checked>
+                  <span id="disc-remix-not-label">🚫 Sin Remix</span>
+                </label>
+                <label class="radio-pill" data-tooltip-title="Todas" data-tooltip="Permite tanto temas originales como remixes y versiones remasterizadas.">
+                  <input type="radio" name="disc-remix-mode" value="any">
+                  <span id="disc-remix-any-label">Todas</span>
+                </label>
+                <label class="radio-pill" data-tooltip-title="Solo Remix / Remaster" data-tooltip="Busca y filtra exclusivamente remixes, club mixes, versiones VIP y temas remasterizados.">
+                  <input type="radio" name="disc-remix-mode" value="only_remix">
+                  <span id="disc-remix-only-label">🎛️ Solo Remix</span>
+                </label>
+              </div>
             </div>
             <label class="switch-row" style="margin-top: 3px;" data-tooltip-title="Low Popularity Only (Hidden Gems)" data-tooltip="Discovers exclusively underground, obscure gems and indie artists rather than mainstream hits.">
               <input type="checkbox" id="disc-low-popularity">

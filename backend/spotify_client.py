@@ -966,11 +966,11 @@ def normalize_text(s: str) -> str:
     return re.sub(r'[^a-zA-Z0-9]', '', s).lower()
 
 def is_live_track(title: str, album: str = "") -> bool:
-    pattern = r'\b(live|en vivo|live at|live from|live in|live session|unplugged|in concert)\b'
+    pattern = r'\b(live|en vivo|live at|live from|live in|live session|unplugged|in concert|ao vivo|directo)\b'
     return bool(re.search(pattern, f"{title} {album}", re.IGNORECASE))
 
 def is_remix_track(title: str, album: str = "") -> bool:
-    pattern = r'\b(remix|rmx|club mix|extended mix|dub mix|radio edit|vip mix|vip edit|vip|mashup|rework)\b'
+    pattern = r'\b(remix|rmx|club mix|extended mix|dub mix|radio edit|vip mix|vip edit|vip|mashup|rework|remaster|remastered|remasterizado|20\d\d remaster|19\d\d remaster)\b'
     return bool(re.search(pattern, f"{title} {album}", re.IGNORECASE))
 
 def get_track_release_year(track_item: Dict[str, Any]) -> Optional[int]:
@@ -986,20 +986,25 @@ def extract_track_clean_dict(t: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if not t or not isinstance(t, dict) or not t.get("id"):
         return None
     artists_str = ", ".join([a["name"] for a in t.get("artists", []) if isinstance(a, dict) and a.get("name")])
+    artist_ids = [a["id"] for a in t.get("artists", []) if isinstance(a, dict) and a.get("id")]
     images = (t.get("album", {}) or {}).get("images", [])
     art_url = images[-1]["url"] if images else (images[0]["url"] if images else "")
     release_date = (t.get("album", {}) or {}).get("release_date", "")
+    pop = t.get("popularity", 0) or 0
     
     return {
         "id": t["id"],
         "uri": t.get("uri", f"spotify:track:{t['id']}"),
         "title": t.get("name", "Unknown Title"),
         "artist": artists_str or "Unknown Artist",
+        "artist_id": artist_ids[0] if artist_ids else "",
+        "artist_ids": artist_ids,
         "album": (t.get("album", {}) or {}).get("name", "Unknown Album"),
         "album_art_url": art_url,
         "duration_ms": t.get("duration_ms", 0) or 0,
         "album_release_date": release_date,
-        "popularity": t.get("popularity", 0) or 0
+        "popularity": pop,
+        "is_hidden_gem": bool(t.get("is_hidden_gem", False) or (pop is not None and pop <= 42))
     }
 
 def clean_seed_genre(val: str) -> Optional[str]:
@@ -1053,6 +1058,8 @@ def discover_boolean_matrix(
     not_recently_played_days: Optional[int] = 30,
     not_live: bool = False,
     not_remix: bool = False,
+    only_live: bool = False,
+    only_remix: bool = False,
     low_popularity_only: bool = False,
     hidden_gem_target: str = "artist",
     target_count: int = 30,
@@ -1066,6 +1073,12 @@ def discover_boolean_matrix(
     recent_identities_list: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     sp = get_spotify_client()
+    
+    # Enforce mutual exclusivity
+    if only_live:
+        not_live = False
+    if only_remix:
+        not_remix = False
     
     # 1. Parse Inclusions (AND) vs Exclusions (NOT)
     pos_artists = [a for a in artists if a.get("modifier", "AND").upper() == "AND"]
@@ -1113,14 +1126,25 @@ def discover_boolean_matrix(
                 if k[0]:
                     excluded_track_keys.add(k)
 
-    if not_recently_played_days:
-        if recent_ids_set:
-            excluded_track_ids.update(recent_ids_set)
+    # Local playback history exclusion
+    if not_recently_played_days and recent_ids_set:
+        excluded_track_ids.update(recent_ids_set)
         if recent_identities_list:
             for item in recent_identities_list:
                 k = get_track_identity_key(item.get("title", ""), item.get("artist", ""))
                 if k[0]:
                     excluded_track_keys.add(k)
+
+    # Specific Track Exclusions from negative track chips
+    for nt in neg_tracks:
+        val = nt.get("value", "")
+        if val:
+            parts = val.split(" - ")
+            t_title = parts[0]
+            t_artist = parts[1] if len(parts) > 1 else ""
+            k = get_track_identity_key(t_title, t_artist)
+            if k[0]:
+                excluded_track_keys.add(k)
 
     # Exclude tracks currently in the active queue vibe
     if use_active_vibe and active_vibe_seeds:
@@ -1130,18 +1154,6 @@ def discover_boolean_matrix(
                 excluded_track_keys.add(k)
         for s_id in active_vibe_seeds.get("sample_track_ids", []):
             excluded_track_ids.add(s_id)
-
-    # Negative user track seeds
-    for nt in neg_tracks:
-        if nt.get("id"):
-            excluded_track_ids.add(nt["id"])
-        if nt.get("value"):
-            parts = nt["value"].split(" - ")
-            t_title = parts[0]
-            t_artist = parts[1] if len(parts) > 1 else ""
-            k = get_track_identity_key(t_title, t_artist)
-            if k[0]:
-                excluded_track_keys.add(k)
 
     # Fetch recent tracks from Spotify API directly if enabled
     if not_recently_played_days and sp:
@@ -1166,7 +1178,6 @@ def discover_boolean_matrix(
 
     # 3. Multi-Strategy Deep Candidate Harvesting
     related_artists_pool: List[Tuple[str, str]] = []  # (artist_id, artist_name)
-    discovered_artist_genres: List[str] = []
 
     if sp:
         # Strategy A: Artist Deep Harvest & Related Artists Discovery
@@ -1175,7 +1186,7 @@ def discover_boolean_matrix(
             if not a_name:
                 continue
 
-            # Check if this artist is ALSO in neg_artists (user wants artists SIMILAR to this artist, but NOT this artist)
+            # Check if this artist is ALSO in neg_artists
             is_also_negative = any(na.get("value", "").strip().lower() == a_name.lower() for na in neg_artists)
 
             if not is_also_negative:
@@ -1188,6 +1199,32 @@ def discover_boolean_matrix(
                     except Exception:
                         pass
 
+                # If only_live is requested, harvest live versions for this artist
+                if only_live:
+                    for offset in [0, 10, 20]:
+                        try:
+                            res = sp.search(q=f'artist:"{a_name}" live', type="track", limit=10, offset=offset)
+                            for t in (res.get("tracks", {}) or {}).get("items", []) or []:
+                                add_candidate(t)
+                        except Exception:
+                            pass
+
+                # If only_remix is requested, harvest remix / remaster versions for this artist
+                if only_remix:
+                    for offset in [0, 10, 20]:
+                        try:
+                            res = sp.search(q=f'artist:"{a_name}" remix', type="track", limit=10, offset=offset)
+                            for t in (res.get("tracks", {}) or {}).get("items", []) or []:
+                                add_candidate(t)
+                        except Exception:
+                            pass
+                        try:
+                            res = sp.search(q=f'artist:"{a_name}" remaster', type="track", limit=10, offset=offset)
+                            for t in (res.get("tracks", {}) or {}).get("items", []) or []:
+                                add_candidate(t)
+                        except Exception:
+                            pass
+
                 # 2. General artist keyword query
                 for offset in [0, 10, 20]:
                     try:
@@ -1197,7 +1234,7 @@ def discover_boolean_matrix(
                     except Exception:
                         pass
 
-            # 3. Discover Similar & Related Artists via Spotify Catalog (ALWAYS run to find similar artists!)
+            # 3. Discover Similar & Related Artists via Spotify Catalog
             try:
                 res_art = sp.search(q=a_name, type="artist", limit=8)
                 for r_art in (res_art.get("artists", {}) or {}).get("items", []) or []:
@@ -1231,6 +1268,10 @@ def discover_boolean_matrix(
             t_val = pt.get("value", "")
             if t_val:
                 search_queries.append(t_val)
+                if only_live:
+                    search_queries.append(f'{t_val} live')
+                if only_remix:
+                    search_queries.append(f'{t_val} remix')
 
         # Genres + decades
         all_query_genres = [g.get("value", "") for g in pos_genres]
@@ -1239,29 +1280,61 @@ def discover_boolean_matrix(
                 cg = clean_seed_genre(g_val) or g_val
                 for y1, y2 in decade_years[:2]:
                     search_queries.append(f'{cg} year:{y1}-{y2}')
+                    if only_live:
+                        search_queries.append(f'{cg} live year:{y1}-{y2}')
+                    if only_remix:
+                        search_queries.append(f'{cg} remix year:{y1}-{y2}')
         elif all_query_genres:
             for g_val in all_query_genres[:4]:
                 cg = clean_seed_genre(g_val) or g_val
                 search_queries.append(f'genre:"{cg}"')
                 search_queries.append(f'{cg}')
+                if only_live:
+                    search_queries.append(f'{cg} live')
+                    search_queries.append(f'{cg} en vivo')
+                if only_remix:
+                    search_queries.append(f'{cg} remix')
+                    search_queries.append(f'{cg} remaster')
 
         for k in pos_keywords[:3]:
-            search_queries.append(f'"{k["value"]}"')
+            k_val = k["value"]
+            search_queries.append(f'"{k_val}"')
+            if only_live:
+                search_queries.append(f'"{k_val}" live')
+            if only_remix:
+                search_queries.append(f'"{k_val}" remix')
 
-        if low_popularity_only and all_query_genres:
-            for g_val in all_query_genres[:2]:
-                if hidden_gem_target in ["artist", "both"]:
-                    search_queries.append(f'emerging {g_val}')
-                    search_queries.append(f'indie {g_val}')
-                    search_queries.append(f'underground {g_val}')
-                if hidden_gem_target in ["track", "both"]:
-                    search_queries.append(f'lo-fi {g_val}')
-                    search_queries.append(f'acoustic {g_val}')
+        if only_live and not search_queries:
+            search_queries.extend(['live in concert', 'en vivo', 'unplugged', 'live session', 'live at'])
+        if only_remix and not search_queries:
+            search_queries.extend(['club remix', 'extended mix', 'remix', 'remastered', 'vip edit'])
+
+        if low_popularity_only:
+            if all_query_genres:
+                for g_val in all_query_genres[:2]:
+                    cg = clean_seed_genre(g_val) or g_val
+                    search_queries.append(f'genre:"{cg}" tag:hipster')
+                    search_queries.append(f'{cg} tag:hipster')
+                    if hidden_gem_target in ["artist", "both"]:
+                        search_queries.append(f'emerging {g_val}')
+                        search_queries.append(f'indie {g_val}')
+                        search_queries.append(f'underground {g_val}')
+                    if hidden_gem_target in ["track", "both"]:
+                        search_queries.append(f'lo-fi {g_val}')
+                        search_queries.append(f'acoustic {g_val}')
+            elif pos_artists:
+                for a in pos_artists[:2]:
+                    a_name = a.get("value", "").strip()
+                    if a_name:
+                        search_queries.append(f'artist:"{a_name}" tag:hipster')
+                        search_queries.append(f'underground {a_name}')
+            else:
+                search_queries.extend(['tag:hipster', 'indie tag:hipster', 'rock tag:hipster', 'pop tag:hipster', 'latino tag:hipster', 'underground'])
 
         if not search_queries and not pos_artists:
             search_queries.extend(['genre:pop', 'genre:rock', 'genre:indie', 'genre:latino', 'year:2024-2026', 'top hits'])
 
-        for sq in search_queries[:8]:
+        for sq in search_queries[:12]:
             for offset in [0, 10, 20]:
                 try:
                     res = sp.search(q=sq, type="track", limit=10, offset=offset)
@@ -1294,6 +1367,10 @@ def discover_boolean_matrix(
                             matches = True
                         if loc_pos_keywords and any(pk in tit or pk in alb for pk in loc_pos_keywords):
                             matches = True
+                        if only_live and not is_live_track(t_loc.get("title", ""), t_loc.get("album", "")):
+                            matches = False
+                        if only_remix and not is_remix_track(t_loc.get("title", ""), t_loc.get("album", "")):
+                            matches = False
                         if matches:
                             add_candidate({
                                 "id": t_loc["id"],
@@ -1307,15 +1384,21 @@ def discover_boolean_matrix(
                 elif not pos_artists and not pos_tracks and not pos_genres and not pos_keywords and not pos_decades and not use_active_vibe:
                     # Only if no positive seeds whatsoever were specified, allow general local pool
                     for t_loc in local_tracks:
-                        add_candidate({
-                            "id": t_loc["id"],
-                            "uri": t_loc.get("uri") or f"spotify:track:{t_loc['id']}",
-                            "name": t_loc.get("title"),
-                            "artists": [{"name": a.strip()} for a in t_loc.get("artist", "").split(",")],
-                            "album": {"name": t_loc.get("album"), "images": [{"url": t_loc.get("album_art_url")}], "release_date": t_loc.get("album_release_date", "")},
-                            "duration_ms": t_loc.get("duration_ms", 0),
-                            "popularity": t_loc.get("popularity", 50)
-                        })
+                        valid = True
+                        if only_live and not is_live_track(t_loc.get("title", ""), t_loc.get("album", "")):
+                            valid = False
+                        if only_remix and not is_remix_track(t_loc.get("title", ""), t_loc.get("album", "")):
+                            valid = False
+                        if valid:
+                            add_candidate({
+                                "id": t_loc["id"],
+                                "uri": t_loc.get("uri") or f"spotify:track:{t_loc['id']}",
+                                "name": t_loc.get("title"),
+                                "artists": [{"name": a.strip()} for a in t_loc.get("artist", "").split(",")],
+                                "album": {"name": t_loc.get("album"), "images": [{"url": t_loc.get("album_art_url")}], "release_date": t_loc.get("album_release_date", "")},
+                                "duration_ms": t_loc.get("duration_ms", 0),
+                                "popularity": t_loc.get("popularity", 50)
+                            })
         except Exception as e:
             print(f"Local candidate fallback error: {e}")
 
@@ -1327,6 +1410,21 @@ def discover_boolean_matrix(
     neg_genre_names = [g["value"].strip().lower() for g in neg_genres if g.get("value")]
     neg_decade_ranges = [DECADE_MAP[d["value"].lower()] for d in neg_decades if d.get("value", "").lower() in DECADE_MAP]
     neg_keyword_terms = [k["value"].strip().lower() for k in neg_keywords if k.get("value")]
+
+    # Pre-fetch artist popularity for candidate filtering when low popularity artist filter is active
+    artist_popularity_map: Dict[str, int] = {}
+    if low_popularity_only and sp:
+        raw_art_ids = [t.get("artist_id") for t in candidates if t.get("artist_id")]
+        unique_art_ids = list(dict.fromkeys(raw_art_ids))[:100]
+        for i in range(0, len(unique_art_ids), 50):
+            chunk = unique_art_ids[i:i+50]
+            try:
+                art_res = sp.artists(chunk)
+                for a_item in (art_res.get("artists", []) if isinstance(art_res, dict) else []) or []:
+                    if a_item and a_item.get("id"):
+                        artist_popularity_map[a_item["id"]] = a_item.get("popularity", 50)
+            except Exception as e:
+                print(f"Batch artist popularity lookup error: {e}")
 
     for t in candidates:
         t_id = t.get("id", "")
@@ -1354,12 +1452,16 @@ def discover_boolean_matrix(
         if any(na in t_artist.lower() for na in neg_artist_names):
             continue
 
-        # Live track filter
+        # Live track filter (mutually exclusive NOT vs ONLY)
         if not_live and is_live_track(t_title, t_album):
             continue
+        if only_live and not is_live_track(t_title, t_album):
+            continue
 
-        # Remix track filter
+        # Remix track filter (mutually exclusive NOT vs ONLY)
         if not_remix and is_remix_track(t_title, t_album):
+            continue
+        if only_remix and not is_remix_track(t_title, t_album):
             continue
 
         # Negative Decade Filter
@@ -1372,12 +1474,26 @@ def discover_boolean_matrix(
         if any(nk in t_title.lower() or nk in t_album.lower() for nk in neg_keyword_terms):
             continue
 
-        # Low Popularity Only (Hidden Gems / Obscure Artists) Filter
-        pop = t.get("popularity")
+        # Low Popularity Only (Hidden Gems / Obscure Artists) Filter & Tagging
+        track_pop = t.get("popularity", 0)
+        art_id = t.get("artist_id", "")
+        art_pop = artist_popularity_map.get(art_id, track_pop if track_pop is not None else 50)
+
         if low_popularity_only:
             if hidden_gem_target in ["track", "both"]:
-                if pop is not None and pop > 42:
+                if track_pop is not None and track_pop > 42:
                     continue
+            if hidden_gem_target in ["artist", "both"]:
+                if art_pop is not None and art_pop > 45:
+                    continue
+            t["is_hidden_gem"] = True
+            t["hidden_gem_type"] = hidden_gem_target
+            t["artist_popularity"] = art_pop
+        else:
+            if (track_pop is not None and track_pop <= 40) or (art_pop is not None and art_pop <= 40):
+                t["is_hidden_gem"] = True
+                t["hidden_gem_type"] = "track" if (track_pop or 0) <= 40 else "artist"
+                t["artist_popularity"] = art_pop
 
         seen_track_keys.add(track_key)
         filtered.append(t)

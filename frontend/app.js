@@ -38,7 +38,9 @@ const state = {
     notInPlaylists: true,
     notRecentlyPlayedDays: 30,
     notLive: true,
+    onlyLive: false,
     notRemix: true,
+    onlyRemix: false,
     lowPopularityOnly: false,
     hiddenGemTarget: 'artist',
     targetCount: 30,
@@ -165,8 +167,8 @@ const DOM = {
   discNotLiked: document.getElementById('disc-not-liked'),
   discNotPlaylists: document.getElementById('disc-not-playlists'),
   discRecentDaysRadios: document.querySelectorAll('input[name="disc-recent-days"]'),
-  discNotLive: document.getElementById('disc-not-live'),
-  discNotRemix: document.getElementById('disc-not-remix'),
+  discLiveModeRadios: document.querySelectorAll('input[name="disc-live-mode"]'),
+  discRemixModeRadios: document.querySelectorAll('input[name="disc-remix-mode"]'),
   discLowPopularity: document.getElementById('disc-low-popularity'),
   discLowPopLabel: document.getElementById('disc-low-pop-label'),
   hiddenGemTargetWrap: document.getElementById('hidden-gem-target-wrap'),
@@ -442,8 +444,14 @@ const I18N = {
     notRecentOff: 'Off',
     notRecent7d: 'Past 7 Days',
     notRecent30d: 'Past 30 Days',
-    notLiveLabel: 'NOT Live',
-    notRemixLabel: 'NOT Remix',
+    discLiveModeTitle: '🎤 Live Versions:',
+    discLiveNotLabel: '🚫 NOT Live',
+    discLiveAnyLabel: 'All',
+    discLiveOnlyLabel: '🎤 ONLY Live',
+    discRemixModeTitle: '🎛️ Remix & Remaster:',
+    discRemixNotLabel: '🚫 NOT Remix',
+    discRemixAnyLabel: 'All',
+    discRemixOnlyLabel: '🎛️ ONLY Remix',
     lowPopularityLabel: '💎 Low Popularity Only (Hidden Gems)',
     targetTracksLabel: 'Target Tracks:',
     trueShuffleAntiClumpLabel: '🔀 True Shuffle + Anti-Clumping',
@@ -477,10 +485,14 @@ const I18N = {
     tipNotInPlaylists: 'Excludes any song that is already saved in any of your Spotify playlists.',
     tipNotRecentTitle: 'NOT Recently Played',
     tipNotRecent: 'Excludes songs played within the last 7 or 30 days.',
-    tipNotLiveTitle: 'NOT Live',
-    tipNotLive: 'Filters out concert recordings, live albums, and en vivo tracks.',
-    tipNotRemixTitle: 'NOT Remix',
-    tipNotRemix: 'Filters out club edits, remixes, VIP mixes, and dub edits.',
+    tipLiveNotTitle: 'NOT Live',
+    tipLiveNot: 'Filters out concert recordings, live albums, and en vivo tracks.',
+    tipLiveOnlyTitle: 'ONLY Live',
+    tipLiveOnly: 'Searches and filters exclusively for live performances, concert recordings, and unplugged versions.',
+    tipRemixNotTitle: 'NOT Remix',
+    tipRemixNot: 'Filters out club edits, remixes, VIP mixes, and remastered tracks.',
+    tipRemixOnlyTitle: 'ONLY Remix / Remastered',
+    tipRemixOnly: 'Searches and filters exclusively for remixes, extended club mixes, VIP edits, and remastered tracks.',
     tipReplaceQueueTitle: 'Replace Main Queue',
     tipReplaceQueue: 'Clears all songs currently in your active listening queue and loads all newly discovered tracks.',
     tipReplacePlayTitle: 'Replace & Play Immediately',
@@ -696,8 +708,14 @@ const I18N = {
     notRecentOff: 'Desactivado',
     notRecent7d: 'Últimos 7 días',
     notRecent30d: 'Últimos 30 días',
-    notLiveLabel: 'NO En Vivo',
-    notRemixLabel: 'NO Remix',
+    discLiveModeTitle: '🎤 Versiones En Vivo:',
+    discLiveNotLabel: '🚫 Sin En Vivo',
+    discLiveAnyLabel: 'Todas',
+    discLiveOnlyLabel: '🎤 Solo En Vivo',
+    discRemixModeTitle: '🎛️ Remix / Remaster:',
+    discRemixNotLabel: '🚫 Sin Remix',
+    discRemixAnyLabel: 'Todas',
+    discRemixOnlyLabel: '🎛️ Solo Remix',
     lowPopularityLabel: '💎 Solo baja popularidad (Joyas ocultas)',
     targetTracksLabel: 'Canciones Objetivo:',
     trueShuffleAntiClumpLabel: '🔀 Aleatorio Real + Anti-Repetición',
@@ -731,10 +749,14 @@ const I18N = {
     tipNotInPlaylists: 'Excluye cualquier canción que ya esté guardada en cualquiera de tus playlists de Spotify.',
     tipNotRecentTitle: 'NO Reproducidas Recientemente',
     tipNotRecent: 'Excluye canciones reproducidas en los últimos 7 o 30 días.',
-    tipNotLiveTitle: 'NO En Vivo',
-    tipNotLive: 'Filtra grabaciones de conciertos, álbumes en directo y versiones en vivo.',
-    tipNotRemixTitle: 'NO Remix',
-    tipNotRemix: 'Filtra ediciones de club, remixes, mezclas VIP y dub edits.',
+    tipLiveNotTitle: 'Sin En Vivo',
+    tipLiveNot: 'Excluye grabaciones en vivo, recitales, acústicos y temas en directo.',
+    tipLiveOnlyTitle: 'Solo En Vivo',
+    tipLiveOnly: 'Busca y filtra exclusivamente versiones en vivo, recitales y acústicos en directo.',
+    tipRemixNotTitle: 'Sin Remix',
+    tipRemixNot: 'Excluye versiones remix, club mix, VIP edits y remasterizaciones.',
+    tipRemixOnlyTitle: 'Solo Remix / Remaster',
+    tipRemixOnly: 'Busca y filtra exclusivamente remixes, club mixes, versiones VIP y temas remasterizados.',
     tipReplaceQueueTitle: 'Reemplazar Cola Principal',
     tipReplaceQueue: 'Borra todas las canciones de tu cola activa y carga todas las canciones recién descubiertas.',
     tipReplacePlayTitle: 'Reemplazar y Reproducir Inmediatamente',
@@ -1057,15 +1079,23 @@ function applyLanguage(lang) {
   document.querySelector('.discovery-sub-block')?.setAttribute('data-tooltip-title', t('tipNotRecentTitle'));
   document.querySelector('.discovery-sub-block')?.setAttribute('data-tooltip', t('tipNotRecent'));
 
-  const notLiveLabel = DOM.discNotLive?.parentElement?.querySelector('.switch-label');
-  if (notLiveLabel) notLiveLabel.textContent = t('notLiveLabel');
-  DOM.discNotLive?.parentElement?.setAttribute('data-tooltip-title', t('tipNotLiveTitle'));
-  DOM.discNotLive?.parentElement?.setAttribute('data-tooltip', t('tipNotLive'));
+  const discLiveTitle = document.getElementById('disc-live-mode-title');
+  if (discLiveTitle) discLiveTitle.textContent = t('discLiveModeTitle');
+  const discLiveNot = document.getElementById('disc-live-not-label');
+  if (discLiveNot) discLiveNot.textContent = t('discLiveNotLabel');
+  const discLiveAny = document.getElementById('disc-live-any-label');
+  if (discLiveAny) discLiveAny.textContent = t('discLiveAnyLabel');
+  const discLiveOnly = document.getElementById('disc-live-only-label');
+  if (discLiveOnly) discLiveOnly.textContent = t('discLiveOnlyLabel');
 
-  const notRemixLabel = DOM.discNotRemix?.parentElement?.querySelector('.switch-label');
-  if (notRemixLabel) notRemixLabel.textContent = t('notRemixLabel');
-  DOM.discNotRemix?.parentElement?.setAttribute('data-tooltip-title', t('tipNotRemixTitle'));
-  DOM.discNotRemix?.parentElement?.setAttribute('data-tooltip', t('tipNotRemix'));
+  const discRemixTitle = document.getElementById('disc-remix-mode-title');
+  if (discRemixTitle) discRemixTitle.textContent = t('discRemixModeTitle');
+  const discRemixNot = document.getElementById('disc-remix-not-label');
+  if (discRemixNot) discRemixNot.textContent = t('discRemixNotLabel');
+  const discRemixAny = document.getElementById('disc-remix-any-label');
+  if (discRemixAny) discRemixAny.textContent = t('discRemixAnyLabel');
+  const discRemixOnly = document.getElementById('disc-remix-only-label');
+  if (discRemixOnly) discRemixOnly.textContent = t('discRemixOnlyLabel');
 
   if (DOM.discLowPopLabel) DOM.discLowPopLabel.textContent = t('lowPopularityLabel');
 
@@ -1664,7 +1694,9 @@ function renderTracksTable() {
     // Col 4: Artist
     const tdArtist = document.createElement('td');
     tdArtist.className = 'col-artist';
-    tdArtist.innerHTML = `<span class="track-artist">${escapeHtml(track.artist)}</span>`;
+    const isGem = Boolean(track.is_hidden_gem || (track.popularity !== undefined && track.popularity > 0 && track.popularity <= 40));
+    const gemIcon = isGem ? `<span class="hidden-gem-badge" style="font-size:8px; padding:0 3px; margin-left:4px;" title="Joya Oculta / Hidden Gem (${track.popularity ?? ''}%)">💎</span>` : '';
+    tdArtist.innerHTML = `<span class="track-artist">${escapeHtml(track.artist)}</span>${gemIcon}`;
     tr.appendChild(tdArtist);
 
     // Col 5: Album
@@ -2612,11 +2644,38 @@ function initDiscoveryPanel() {
       }
     });
   });
-  DOM.discNotLive?.addEventListener('change', (e) => {
-    state.discovery.notLive = e.target.checked;
+  DOM.discLiveModeRadios?.forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        if (e.target.value === 'not_live') {
+          state.discovery.notLive = true;
+          state.discovery.onlyLive = false;
+        } else if (e.target.value === 'only_live') {
+          state.discovery.notLive = false;
+          state.discovery.onlyLive = true;
+        } else {
+          state.discovery.notLive = false;
+          state.discovery.onlyLive = false;
+        }
+      }
+    });
   });
-  DOM.discNotRemix?.addEventListener('change', (e) => {
-    state.discovery.notRemix = e.target.checked;
+
+  DOM.discRemixModeRadios?.forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        if (e.target.value === 'not_remix') {
+          state.discovery.notRemix = true;
+          state.discovery.onlyRemix = false;
+        } else if (e.target.value === 'only_remix') {
+          state.discovery.notRemix = false;
+          state.discovery.onlyRemix = true;
+        } else {
+          state.discovery.notRemix = false;
+          state.discovery.onlyRemix = false;
+        }
+      }
+    });
   });
   DOM.discLowPopularity?.addEventListener('change', (e) => {
     state.discovery.lowPopularityOnly = e.target.checked;
@@ -2980,6 +3039,8 @@ async function generateDiscoveryMix() {
     not_recently_played_days: state.discovery.notRecentlyPlayedDays || null,
     not_live: state.discovery.notLive,
     not_remix: state.discovery.notRemix,
+    only_live: state.discovery.onlyLive,
+    only_remix: state.discovery.onlyRemix,
     low_popularity_only: state.discovery.lowPopularityOnly,
     hidden_gem_target: state.discovery.hiddenGemTarget || 'artist',
     target_count: state.discovery.targetCount,
@@ -3064,6 +3125,20 @@ function renderDiscoveryResultsItems(tracks) {
       ? `<img class="track-album-art" style="width:24px;height:24px;border-radius:3px;object-fit:cover;" src="${track.album_art_url}" alt="" loading="lazy">`
       : `<div class="track-album-art-placeholder" style="width:24px;height:24px;font-size:10px;">🎵</div>`;
 
+    // Hidden Gem Indicator
+    const isGem = Boolean(track.is_hidden_gem || (track.popularity !== undefined && track.popularity <= 42 && state.discovery.lowPopularityOnly));
+    let gemBadgeHtml = '';
+    if (isGem) {
+      const isEs = state.currentLang === 'es';
+      const gemLabel = isEs ? '💎 Joya Oculta' : '💎 Hidden Gem';
+      const popVal = track.popularity !== undefined ? `${track.popularity}%` : (track.artist_popularity !== undefined ? `${track.artist_popularity}%` : '');
+      const popBadgeText = popVal ? ` (${popVal})` : '';
+      const tooltip = isEs
+        ? `Joya Oculta: Índice de popularidad en Spotify bajo (${popVal || 'desconocido'})`
+        : `Hidden Gem: Low Spotify popularity metric (${popVal || 'unknown'})`;
+      gemBadgeHtml = `<span class="hidden-gem-badge" title="${escapeHtml(tooltip)}">${gemLabel}${popBadgeText}</span>`;
+    }
+
     const metaWrap = document.createElement('div');
     metaWrap.className = 'right-item-meta';
     metaWrap.style.flex = '1';
@@ -3073,8 +3148,9 @@ function renderDiscoveryResultsItems(tracks) {
         ${imgHtml}
         <div style="flex:1; min-width:0;">
           <div class="right-item-title" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(track.title)}</div>
-          <div class="right-item-subtitle-row">
+          <div class="right-item-subtitle-row" style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
             <span class="right-item-artist" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(track.artist)}</span>
+            ${gemBadgeHtml}
           </div>
         </div>
       </div>
