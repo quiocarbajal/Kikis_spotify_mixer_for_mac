@@ -243,7 +243,7 @@ const I18N = {
     filterPlaceholder: 'Filter active list... (Keyboard shortcut: /)',
     clearFilter: 'Clear Filter',
     loginBtn: 'Log in with Spotify',
-    loginNeeded: 'Login Needed',
+    loginNeeded: 'Not Logged',
     syncBtn: 'Sync Library',
     syncingBtn: 'Syncing...',
     syncHeroTitle: 'Syncing your Spotify Library...',
@@ -507,7 +507,7 @@ const I18N = {
     filterPlaceholder: 'Filtrar lista activa... (Atajo de teclado: /)',
     clearFilter: 'Borrar filtro',
     loginBtn: 'Iniciar sesión con Spotify',
-    loginNeeded: 'Iniciar sesión',
+    loginNeeded: 'No conectado',
     syncBtn: 'Sincronizar biblioteca',
     syncingBtn: 'Sincronizando...',
     syncHeroTitle: 'Sincronizando tu biblioteca de Spotify...',
@@ -813,16 +813,18 @@ function applyLanguage(lang) {
     DOM.sidebarSyncBtn.setAttribute('data-tooltip', t('tipSync'));
   }
 
-  const loginText = DOM.loginBtn?.querySelector('.btn-text');
-  if (loginText) loginText.textContent = t('loginBtn');
-  DOM.loginBtn?.setAttribute('data-tooltip-title', t('tipLoginTitle'));
-  DOM.loginBtn?.setAttribute('data-tooltip', t('tipLogin'));
-
   DOM.settingsBtn?.setAttribute('data-tooltip-title', t('tipSettingsTitle'));
   DOM.settingsBtn?.setAttribute('data-tooltip', t('tipSettings'));
 
   DOM.connectionBadge?.setAttribute('data-tooltip-title', t('tipConnectionTitle'));
   DOM.connectionBadge?.setAttribute('data-tooltip', t('tipConnection'));
+  if (DOM.statusText) {
+    if (state.authenticated) {
+      DOM.statusText.textContent = t('connected') || 'Spotify Online';
+    } else {
+      DOM.statusText.textContent = t('loginNeeded') || 'Not Logged';
+    }
+  }
 
   // Sidebar Sections
   const sidebarTitles = document.querySelectorAll('#sidebar .section-title');
@@ -1408,8 +1410,7 @@ async function checkStatus() {
       stopAuthPoller();
     } else {
       DOM.connectionBadge.className = 'status-badge status-offline';
-      DOM.statusText.textContent = t('loginNeeded') || 'Login Needed';
-      DOM.loginBtn?.classList.remove('hidden');
+      DOM.statusText.textContent = t('loginNeeded') || 'Not Logged';
       if (!state.isSyncing) {
         DOM.connectWelcomeHero?.classList.remove('hidden');
         DOM.tracksTable?.classList.add('hidden');
