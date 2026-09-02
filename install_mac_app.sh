@@ -50,6 +50,8 @@ cp -R frontend "$APP_DIR/Contents/Resources/frontend"
 if [ -d ".venv" ]; then
     cp -R .venv "$APP_DIR/Contents/Resources/venv"
 fi
+find "$APP_DIR" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+find "$APP_DIR" -name "*.pyc" -delete 2>/dev/null || true
 cp requirements.txt "$APP_DIR/Contents/Resources/requirements.txt"
 cp .env.example "$APP_DIR/Contents/Resources/.env.example"
 echo -n "APPL????" > "$APP_DIR/Contents/PkgInfo"
