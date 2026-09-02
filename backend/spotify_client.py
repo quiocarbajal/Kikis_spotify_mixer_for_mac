@@ -51,6 +51,7 @@ DEFAULT_CLIENT_ID = "5422e5d127b845198527048f9f7529cf"
 DEFAULT_REDIRECT_URI = "http://127.0.0.1:8888/callback"
 
 _active_code_verifier: Optional[str] = None
+_current_oauth_instance: Optional[Union[SpotifyOAuth, SpotifyPKCE]] = None
 
 class PersistentSpotifyPKCE(SpotifyPKCE):
     """
@@ -71,12 +72,23 @@ class PersistentSpotifyPKCE(SpotifyPKCE):
                         self.code_verifier = saved
             except Exception:
                 pass
+                
+        if self.code_verifier and not self.code_challenge:
+            try:
+                self.code_challenge = self._get_code_challenge()
+            except Exception:
+                pass
 
     def get_authorize_url(self, state: Optional[str] = None) -> str:
         global _active_code_verifier
         url = super().get_authorize_url(state=state)
         if self.code_verifier:
             _active_code_verifier = self.code_verifier
+            if not self.code_challenge:
+                try:
+                    self.code_challenge = self._get_code_challenge()
+                except Exception:
+                    pass
             if self.verifier_path:
                 try:
                     with open(self.verifier_path, "w", encoding="utf-8") as f:
@@ -87,19 +99,35 @@ class PersistentSpotifyPKCE(SpotifyPKCE):
 
     def get_access_token(self, code: Optional[str] = None, check_cache: bool = True, as_dict: bool = True, **kwargs):
         global _active_code_verifier
-        res = super().get_access_token(code=code, check_cache=check_cache)
-        _active_code_verifier = None
-        if self.verifier_path and os.path.exists(self.verifier_path):
-            try:
-                os.remove(self.verifier_path)
-            except Exception:
-                pass
-        return res
+        try:
+            if self.code_verifier and not self.code_challenge:
+                try:
+                    self.code_challenge = self._get_code_challenge()
+                except Exception:
+                    pass
+            res = super().get_access_token(code=code, check_cache=check_cache)
+            return res
+        finally:
+            _active_code_verifier = None
+            if self.verifier_path and os.path.exists(self.verifier_path):
+                try:
+                    os.remove(self.verifier_path)
+                except Exception:
+                    pass
 
 def get_cache_handler() -> CacheFileHandler:
     return CacheFileHandler(cache_path=CACHE_PATH)
 
-def get_spotify_oauth() -> Optional[Union[SpotifyOAuth, SpotifyPKCE]]:
+def reset_oauth_manager():
+    global _current_oauth_instance, _active_code_verifier
+    _current_oauth_instance = None
+    _active_code_verifier = None
+
+def get_spotify_oauth(force_new: bool = False) -> Optional[Union[SpotifyOAuth, SpotifyPKCE]]:
+    global _current_oauth_instance
+    if not force_new and _current_oauth_instance is not None:
+        return _current_oauth_instance
+
     client_id = os.getenv("SPOTIFY_CLIENT_ID") or DEFAULT_CLIENT_ID
     client_secret = os.getenv("SPOTIFY_CLIENT_SECRET")
     redirect_uri = os.getenv("SPOTIFY_REDIRECT_URI", DEFAULT_REDIRECT_URI)
@@ -112,7 +140,7 @@ def get_spotify_oauth() -> Optional[Union[SpotifyOAuth, SpotifyPKCE]]:
 
     # If user provided a custom client_secret (e.g. via local .env or custom settings), use standard SpotifyOAuth
     if client_secret and client_secret != "your_client_secret_here":
-        return SpotifyOAuth(
+        _current_oauth_instance = SpotifyOAuth(
             client_id=client_id,
             client_secret=client_secret,
             redirect_uri=redirect_uri,
@@ -120,15 +148,17 @@ def get_spotify_oauth() -> Optional[Union[SpotifyOAuth, SpotifyPKCE]]:
             cache_handler=get_cache_handler(),
             open_browser=False
         )
+        return _current_oauth_instance
 
     # By default, use PKCE (zero secret required or exposed!)
-    return PersistentSpotifyPKCE(
+    _current_oauth_instance = PersistentSpotifyPKCE(
         client_id=client_id,
         redirect_uri=redirect_uri,
         scope=" ".join(SCOPES),
         cache_handler=get_cache_handler(),
         open_browser=False
     )
+    return _current_oauth_instance
 
 def get_spotify_client() -> Optional[spotipy.Spotify]:
     oauth = get_spotify_oauth()

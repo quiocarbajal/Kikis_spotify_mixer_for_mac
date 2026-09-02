@@ -195,7 +195,11 @@ def auth_callback(code: Optional[str] = None, error: Optional[str] = None):
         
     oauth = sp_client.get_spotify_oauth()
     if oauth:
-        oauth.get_access_token(code, as_dict=False)
+        try:
+            oauth.get_access_token(code, as_dict=False)
+        except Exception as e:
+            traceback.print_exc()
+            return HTMLResponse(f"<h3>Spotify Login Error</h3><p>{e}</p><p><a href='/api/auth/login'>Click here to try logging in again</a></p>")
         
     return RedirectResponse("/?auth=success")
 
@@ -208,6 +212,7 @@ def auth_logout():
         except Exception:
             pass
     db.clear_all_data()
+    sp_client.reset_oauth_manager()
     return {"success": True, "message": "Logged out and library reset"}
 
 # --- Search Catalog & Song Discovery ---
