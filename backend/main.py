@@ -41,7 +41,7 @@ app = FastAPI(title="Kiki's Spotify Mixer", lifespan=lifespan)
 
 class CredentialsRequest(BaseModel):
     client_id: str
-    client_secret: str
+    client_secret: Optional[str] = None
     redirect_uri: Optional[str] = "http://127.0.0.1:8888/callback"
 
 class ReorderRequest(BaseModel):
@@ -151,14 +151,22 @@ def get_sync_status():
 def save_credentials(creds: CredentialsRequest):
     env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
     
-    os.environ["SPOTIFY_CLIENT_ID"] = creds.client_id.strip()
-    os.environ["SPOTIFY_CLIENT_SECRET"] = creds.client_secret.strip()
-    os.environ["SPOTIFY_REDIRECT_URI"] = creds.redirect_uri.strip()
+    client_id = creds.client_id.strip() if creds.client_id else ""
+    client_secret = creds.client_secret.strip() if creds.client_secret else ""
+    redirect_uri = creds.redirect_uri.strip() if creds.redirect_uri else "http://127.0.0.1:8888/callback"
+    
+    os.environ["SPOTIFY_CLIENT_ID"] = client_id
+    if client_secret:
+        os.environ["SPOTIFY_CLIENT_SECRET"] = client_secret
+    elif "SPOTIFY_CLIENT_SECRET" in os.environ:
+        del os.environ["SPOTIFY_CLIENT_SECRET"]
+    os.environ["SPOTIFY_REDIRECT_URI"] = redirect_uri
     
     with open(env_path, "w") as f:
-        f.write(f"SPOTIFY_CLIENT_ID={creds.client_id.strip()}\n")
-        f.write(f"SPOTIFY_CLIENT_SECRET={creds.client_secret.strip()}\n")
-        f.write(f"SPOTIFY_REDIRECT_URI={creds.redirect_uri.strip()}\n")
+        f.write(f"SPOTIFY_CLIENT_ID={client_id}\n")
+        if client_secret:
+            f.write(f"SPOTIFY_CLIENT_SECRET={client_secret}\n")
+        f.write(f"SPOTIFY_REDIRECT_URI={redirect_uri}\n")
         f.write(f"HOST=0.0.0.0\nPORT=8888\nDATABASE_PATH=spotify_tags.db\n")
         
     return {"success": True, "message": "Credentials saved"}

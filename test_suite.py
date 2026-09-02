@@ -97,6 +97,18 @@ class TestSpotifySmartController(unittest.TestCase):
         self.assertEqual(res_tracks.status_code, 200)
         self.assertGreaterEqual(len(res_tracks.json()["tracks"]), 4)
 
+        # Test PKCE Auth login URL generation
+        res_login = client.get("/api/auth/login")
+        self.assertEqual(res_login.status_code, 200)
+        self.assertIn("auth_url", res_login.json())
+        self.assertIn("accounts.spotify.com/authorize", res_login.json()["auth_url"])
+        self.assertIn("code_challenge=", res_login.json()["auth_url"])
+
+        # Test Credentials save with client_id only (PKCE mode)
+        res_creds = client.post("/api/credentials", json={"client_id": "test_client_id_pkce"})
+        self.assertEqual(res_creds.status_code, 200)
+        self.assertTrue(res_creds.json()["success"])
+
     def test_06_discovery_genres_and_decades(self):
         client = TestClient(app)
         

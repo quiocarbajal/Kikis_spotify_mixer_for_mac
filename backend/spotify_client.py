@@ -5,8 +5,8 @@ import random
 import unicodedata
 from datetime import datetime
 import spotipy
-from spotipy.oauth2 import SpotifyOAuth, CacheFileHandler
-from typing import Optional, Dict, Any, List, Tuple, Set
+from spotipy.oauth2 import SpotifyOAuth, SpotifyPKCE, CacheFileHandler
+from typing import Optional, Dict, Any, List, Tuple, Set, Union
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -41,30 +41,89 @@ def get_user_data_dir() -> str:
 
 DATA_DIR = get_user_data_dir()
 CACHE_PATH = os.getenv("SPOTIFY_CACHE_PATH", os.path.join(DATA_DIR, ".spotify_cache"))
+PKCE_VERIFIER_PATH = os.path.join(DATA_DIR, ".pkce_verifier")
 
 _playback_cache: Optional[Dict[str, Any]] = None
 _last_playback_time: float = 0.0
 PLAYBACK_CACHE_TTL = 3.0  # seconds
 
 DEFAULT_CLIENT_ID = "5422e5d127b845198527048f9f7529cf"
-DEFAULT_CLIENT_SECRET = ""
 DEFAULT_REDIRECT_URI = "http://127.0.0.1:8888/callback"
+
+_active_code_verifier: Optional[str] = None
+
+class PersistentSpotifyPKCE(SpotifyPKCE):
+    """
+    SpotifyPKCE subclass that persists the code_verifier across HTTP requests
+    so that FastAPI /callback can exchange the authorization code for tokens.
+    """
+    def __init__(self, *args, verifier_path: Optional[str] = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        global _active_code_verifier
+        self.verifier_path = verifier_path or PKCE_VERIFIER_PATH
+        if _active_code_verifier:
+            self.code_verifier = _active_code_verifier
+        elif self.verifier_path and os.path.exists(self.verifier_path):
+            try:
+                with open(self.verifier_path, "r", encoding="utf-8") as f:
+                    saved = f.read().strip()
+                    if saved:
+                        self.code_verifier = saved
+            except Exception:
+                pass
+
+    def get_authorize_url(self, state: Optional[str] = None) -> str:
+        global _active_code_verifier
+        url = super().get_authorize_url(state=state)
+        if self.code_verifier:
+            _active_code_verifier = self.code_verifier
+            if self.verifier_path:
+                try:
+                    with open(self.verifier_path, "w", encoding="utf-8") as f:
+                        f.write(self.code_verifier)
+                except Exception:
+                    pass
+        return url
+
+    def get_access_token(self, code: Optional[str] = None, check_cache: bool = True, as_dict: bool = True, **kwargs):
+        global _active_code_verifier
+        res = super().get_access_token(code=code, check_cache=check_cache)
+        _active_code_verifier = None
+        if self.verifier_path and os.path.exists(self.verifier_path):
+            try:
+                os.remove(self.verifier_path)
+            except Exception:
+                pass
+        return res
 
 def get_cache_handler() -> CacheFileHandler:
     return CacheFileHandler(cache_path=CACHE_PATH)
 
-def get_spotify_oauth() -> Optional[SpotifyOAuth]:
+def get_spotify_oauth() -> Optional[Union[SpotifyOAuth, SpotifyPKCE]]:
     client_id = os.getenv("SPOTIFY_CLIENT_ID") or DEFAULT_CLIENT_ID
-    client_secret = os.getenv("SPOTIFY_CLIENT_SECRET") or DEFAULT_CLIENT_SECRET
+    client_secret = os.getenv("SPOTIFY_CLIENT_SECRET")
     redirect_uri = os.getenv("SPOTIFY_REDIRECT_URI", DEFAULT_REDIRECT_URI)
     
-    if not client_id or not client_secret or client_id == "your_client_id_here":
+    if not client_id or client_id == "your_client_id_here":
         client_id = DEFAULT_CLIENT_ID
-        client_secret = DEFAULT_CLIENT_SECRET
         
-    return SpotifyOAuth(
+    if not client_id:
+        return None
+
+    # If user provided a custom client_secret (e.g. via local .env or custom settings), use standard SpotifyOAuth
+    if client_secret and client_secret != "your_client_secret_here":
+        return SpotifyOAuth(
+            client_id=client_id,
+            client_secret=client_secret,
+            redirect_uri=redirect_uri,
+            scope=" ".join(SCOPES),
+            cache_handler=get_cache_handler(),
+            open_browser=False
+        )
+
+    # By default, use PKCE (zero secret required or exposed!)
+    return PersistentSpotifyPKCE(
         client_id=client_id,
-        client_secret=client_secret,
         redirect_uri=redirect_uri,
         scope=" ".join(SCOPES),
         cache_handler=get_cache_handler(),

@@ -81,21 +81,31 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
     func startBackendServerIfNeeded() {
         let fileManager = FileManager.default
         let bundleResourcePath = Bundle.main.resourcePath ?? ""
-        let devProjectPath = "."
-        let devPythonPath = "\(devProjectPath)/.venv/bin/python"
+        let currentDir = fileManager.currentDirectoryPath
+        let envDevPath = ProcessInfo.processInfo.environment["DEV_PROJECT_PATH"] ?? ""
 
-        // Determine working directory (prefer bundle resources if installed, else dev directory)
-        var workingDir = devProjectPath
+        // Determine working directory (prefer bundle resources if installed, else current or env directory)
+        var workingDir = currentDir
         if fileManager.fileExists(atPath: "\(bundleResourcePath)/backend/main.py") {
             workingDir = bundleResourcePath
+        } else if !envDevPath.isEmpty && fileManager.fileExists(atPath: "\(envDevPath)/backend/main.py") {
+            workingDir = envDevPath
+        } else if !fileManager.fileExists(atPath: "\(workingDir)/backend/main.py") {
+            let parentDir = Bundle.main.bundleURL.deletingLastPathComponent().path
+            if fileManager.fileExists(atPath: "\(parentDir)/backend/main.py") {
+                workingDir = parentDir
+            }
         }
+
+        let localVenvPython = "\(workingDir)/.venv/bin/python"
+        let bundleVenvPython = "\(bundleResourcePath)/venv/bin/python"
 
         // Determine python executable
         var pythonPath = "/usr/bin/python3"
-        if fileManager.fileExists(atPath: "\(bundleResourcePath)/venv/bin/python") {
-            pythonPath = "\(bundleResourcePath)/venv/bin/python"
-        } else if fileManager.fileExists(atPath: devPythonPath) {
-            pythonPath = devPythonPath
+        if fileManager.fileExists(atPath: bundleVenvPython) {
+            pythonPath = bundleVenvPython
+        } else if fileManager.fileExists(atPath: localVenvPython) {
+            pythonPath = localVenvPython
         } else if fileManager.fileExists(atPath: "/opt/homebrew/bin/python3") {
             pythonPath = "/opt/homebrew/bin/python3"
         } else if fileManager.fileExists(atPath: "/usr/local/bin/python3") {

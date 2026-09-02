@@ -3756,10 +3756,10 @@ function initEventListeners() {
   DOM.saveCredentialsBtn?.addEventListener('click', async () => {
     const client_id = DOM.settingsClientId.value.trim();
     const client_secret = DOM.settingsClientSecret.value.trim();
-    if (client_id && client_secret) {
+    if (client_id) {
       await api('/api/credentials', {
         method: 'POST',
-        body: JSON.stringify({ client_id, client_secret })
+        body: JSON.stringify({ client_id, client_secret: client_secret || null })
       });
       const auth = await api('/api/auth/login');
       if (auth.auth_url) window.location.href = auth.auth_url;
