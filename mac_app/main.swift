@@ -47,6 +47,47 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
+        let loadingHTML = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <meta charset="utf-8">
+        <style>
+        body {
+            margin: 0;
+            background: #121212;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            user-select: none;
+        }
+        .spinner {
+            width: 44px;
+            height: 44px;
+            border: 3px solid rgba(255, 255, 255, 0.15);
+            border-top-color: #1DB954;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 24px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        h2 { font-size: 20px; font-weight: 600; margin: 0 0 8px 0; letter-spacing: -0.3px; }
+        p { font-size: 13px; color: #888; margin: 0; }
+        </style>
+        </head>
+        <body>
+            <div class="spinner"></div>
+            <h2>Kiki's Spotify Mixer</h2>
+            <p>Starting background engine...</p>
+        </body>
+        </html>
+        """
+        webView.loadHTMLString(loadingHTML, baseURL: nil)
+
         loadAppURL()
     }
 
@@ -84,7 +125,33 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         let currentDir = fileManager.currentDirectoryPath
         let envDevPath = ProcessInfo.processInfo.environment["DEV_PROJECT_PATH"] ?? ""
 
-        // Determine working directory (prefer bundle resources if installed, else current or env directory)
+        // Check for compiled standalone binary first (no python required on target Mac)
+        let standaloneCandidates = [
+            "\(bundleResourcePath)/kiki_backend/kiki_backend",
+            "\(Bundle.main.bundleURL.path)/Contents/MacOS/kiki_backend",
+            "\(bundleResourcePath)/../MacOS/kiki_backend",
+            "\(currentDir)/dist/kiki_backend/kiki_backend"
+        ]
+
+        for candidate in standaloneCandidates {
+            if fileManager.isExecutableFile(atPath: candidate) {
+                let proc = Process()
+                proc.executableURL = URL(fileURLWithPath: candidate)
+                proc.arguments = []
+                proc.currentDirectoryURL = URL(fileURLWithPath: (candidate as NSString).deletingLastPathComponent)
+                proc.standardOutput = FileHandle.nullDevice
+                proc.standardError = FileHandle.nullDevice
+                do {
+                    try proc.run()
+                    self.serverProcess = proc
+                    return
+                } catch {
+                    print("Standalone backend launch error: \(error)")
+                }
+            }
+        }
+
+        // Determine working directory for Python fallback
         var workingDir = currentDir
         if fileManager.fileExists(atPath: "\(bundleResourcePath)/backend/main.py") {
             workingDir = bundleResourcePath
@@ -127,7 +194,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         }
     }
 
-    func loadAppURL(retries: Int = 30) {
+    func loadAppURL(retries: Int = 40) {
         guard let statusURL = URL(string: "http://127.0.0.1:8888/api/status") else { return }
         let appURL = URL(string: "http://127.0.0.1:8888")!
         var request = URLRequest(url: appURL)
@@ -146,7 +213,52 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
                 }
             } else {
                 DispatchQueue.main.async {
-                    self?.webView.load(request)
+                    let errorHTML = """
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                    <meta charset="utf-8">
+                    <style>
+                    body {
+                        margin: 0;
+                        background: #121212;
+                        color: #ffffff;
+                        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        height: 100vh;
+                        padding: 40px;
+                        box-sizing: border-box;
+                        text-align: center;
+                        user-select: none;
+                    }
+                    .icon { font-size: 48px; margin-bottom: 16px; }
+                    h2 { font-size: 22px; font-weight: 600; margin: 0 0 10px 0; }
+                    p { font-size: 14px; color: #aaa; margin: 0 0 24px 0; max-width: 440px; line-height: 1.5; }
+                    button {
+                        background: #1DB954;
+                        color: #000000;
+                        border: none;
+                        padding: 10px 24px;
+                        font-size: 14px;
+                        font-weight: 600;
+                        border-radius: 20px;
+                        cursor: pointer;
+                    }
+                    button:hover { background: #1ed760; }
+                    </style>
+                    </head>
+                    <body>
+                        <div class="icon">⚠️</div>
+                        <h2>Connection Timeout</h2>
+                        <p>Could not connect to the local mixer engine on port 8888. Please ensure no other application is blocking this port, or try relaunching.</p>
+                        <button onclick="window.location.reload()">Retry Connection</button>
+                    </body>
+                    </html>
+                    """
+                    self?.webView.loadHTMLString(errorHTML, baseURL: nil)
                     NSApp.activate(ignoringOtherApps: true)
                     self?.window?.makeKeyAndOrderFront(nil)
                 }

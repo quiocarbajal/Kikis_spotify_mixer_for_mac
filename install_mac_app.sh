@@ -27,16 +27,30 @@ if [ -f "Icon.jpeg" ]; then
     cp Icon.jpeg frontend/icon.jpeg
 fi
 
-# 2. Compile Swift native launcher (if swiftc available, fallback to pre-compiled binary)
+# 2. Compile Swift native launcher
 echo "🔨 Preparing native macOS launcher binary..."
 mkdir -p mac_app
-if [ ! -f "mac_app/kiki_spotify_launcher" ]; then
-    swiftc mac_app/main.swift -o mac_app/kiki_spotify_launcher -framework Cocoa -framework WebKit
-else
-    swiftc mac_app/main.swift -o mac_app/kiki_spotify_launcher -framework Cocoa -framework WebKit 2>/dev/null || echo "Using existing compiled launcher binary."
+swiftc mac_app/main.swift -o mac_app/kiki_spotify_launcher -framework Cocoa -framework WebKit 2>/dev/null || echo "Using existing compiled launcher binary if available."
+
+# 3. Ensure standalone backend is built
+if [ ! -f "dist/kiki_backend/kiki_backend" ]; then
+    echo "⚡ Compiling standalone backend with PyInstaller..."
+    export PYINSTALLER_CONFIG_DIR="$DIR/.pyinstaller_cache"
+    mkdir -p "$PYINSTALLER_CONFIG_DIR"
+    .venv/bin/pyinstaller --clean -y --onedir --name kiki_backend \
+        --hidden-import=uvicorn.logging \
+        --hidden-import=uvicorn.loops \
+        --hidden-import=uvicorn.loops.auto \
+        --hidden-import=uvicorn.protocols \
+        --hidden-import=uvicorn.protocols.http \
+        --hidden-import=uvicorn.protocols.http.auto \
+        --hidden-import=uvicorn.protocols.websockets \
+        --hidden-import=uvicorn.protocols.websockets.auto \
+        --add-data "frontend:frontend" \
+        backend/main.py
 fi
 
-# 3. Create .app bundle
+# 4. Create .app bundle
 APP_DIR="Kiki's Spotify Mixer.app"
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS"
@@ -45,11 +59,9 @@ mkdir -p "$APP_DIR/Contents/Resources"
 cp mac_app/kiki_spotify_launcher "$APP_DIR/Contents/MacOS/kiki_spotify_launcher"
 chmod +x "$APP_DIR/Contents/MacOS/kiki_spotify_launcher"
 cp app_icon.icns "$APP_DIR/Contents/Resources/AppIcon.icns"
-cp -R backend "$APP_DIR/Contents/Resources/backend"
+cp -R dist/kiki_backend "$APP_DIR/Contents/Resources/kiki_backend"
+chmod +x "$APP_DIR/Contents/Resources/kiki_backend/kiki_backend"
 cp -R frontend "$APP_DIR/Contents/Resources/frontend"
-if [ -d ".venv" ]; then
-    cp -R .venv "$APP_DIR/Contents/Resources/venv"
-fi
 find "$APP_DIR" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 find "$APP_DIR" -name "*.pyc" -delete 2>/dev/null || true
 cp requirements.txt "$APP_DIR/Contents/Resources/requirements.txt"

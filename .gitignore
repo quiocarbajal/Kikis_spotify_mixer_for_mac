@@ -43,3 +43,7 @@ build/
 *.dmg.tmp
 mac_app/kiki_spotify_launcher
 
+# PyInstaller
+.pyinstaller_cache/
+*.spec
+

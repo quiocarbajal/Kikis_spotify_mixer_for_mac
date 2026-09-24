@@ -27,8 +27,12 @@ SCOPES = [
 
 def get_user_data_dir() -> str:
     app_data = os.getenv("APP_DATA_DIR")
-    if app_data and os.path.isdir(app_data):
-        return app_data
+    if app_data:
+        try:
+            os.makedirs(app_data, exist_ok=True)
+            return app_data
+        except Exception:
+            pass
     
     app_support = os.path.expanduser("~/Library/Application Support/KikisSpotifyMixer")
     try:
@@ -36,8 +40,19 @@ def get_user_data_dir() -> str:
         return app_support
     except Exception:
         pass
+
+    dot_dir = os.path.expanduser("~/.kikis_spotify_mixer")
+    try:
+        os.makedirs(dot_dir, exist_ok=True)
+        return dot_dir
+    except Exception:
+        pass
         
-    return os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    cwd = os.getcwd()
+    if os.access(cwd, os.W_OK):
+        return cwd
+
+    return os.path.abspath(os.path.dirname(sys.executable))
 
 DATA_DIR = get_user_data_dir()
 CACHE_PATH = os.getenv("SPOTIFY_CACHE_PATH", os.path.join(DATA_DIR, ".spotify_cache"))

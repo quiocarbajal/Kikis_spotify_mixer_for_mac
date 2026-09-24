@@ -700,6 +700,32 @@ def get_player_state():
 
 # --- Static Frontend Serving ---
 
-frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
-if os.path.exists(frontend_path):
-    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
+def get_frontend_dir() -> str:
+    env_dir = os.getenv("FRONTEND_PATH")
+    if env_dir and os.path.isdir(env_dir):
+        return env_dir
+    if hasattr(sys, "_MEIPASS"):
+        meipass_fe = os.path.join(sys._MEIPASS, "frontend")
+        if os.path.isdir(meipass_fe):
+            return meipass_fe
+    candidates = [
+        os.path.join(os.path.dirname(sys.executable), "frontend"),
+        os.path.join(os.path.dirname(sys.executable), "..", "Resources", "frontend"),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "frontend")),
+    ]
+    for c in candidates:
+        if os.path.isdir(c):
+            return c
+    return ""
+
+frontend_dir = get_frontend_dir()
+if frontend_dir and os.path.isdir(frontend_dir):
+    app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
+
+if __name__ == "__main__":
+    import multiprocessing
+    multiprocessing.freeze_support()
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8888, log_level="info")
+
