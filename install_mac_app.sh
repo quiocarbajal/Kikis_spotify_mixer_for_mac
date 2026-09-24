@@ -50,6 +50,11 @@ if [ ! -f "dist/kiki_backend/kiki_backend" ]; then
         backend/main.py
 fi
 
+# Always ensure dist backend bundle has the freshest frontend assets
+if [ -d "dist/kiki_backend/_internal/frontend" ]; then
+    cp -R frontend/* dist/kiki_backend/_internal/frontend/
+fi
+
 # 4. Create .app bundle
 APP_DIR="Kiki's Spotify Mixer.app"
 rm -rf "$APP_DIR"

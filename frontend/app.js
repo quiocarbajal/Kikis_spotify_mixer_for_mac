@@ -422,6 +422,12 @@ const I18N = {
     tipVolume: 'Adjust Spotify streaming volume level.',
     tipDeviceTitle: 'Playback Device',
     tipDevice: 'Select active Spotify Connect output device (Mac, Phone, Speaker).',
+    tipPlayTrackTitle: 'Play Track',
+    tipPlayTrack: 'Play this track directly in Spotify and queue remaining songs.',
+    tipPauseTrackTitle: 'Pause Track',
+    tipPauseTrack: 'Pause current playback in Spotify.',
+    tipResumeTrackTitle: 'Resume Track',
+    tipResumeTrack: 'Resume playing this track in Spotify.',
     
     // Discovery Engine
     discoveryPanelHeading: 'Discovery Engine',
@@ -686,6 +692,12 @@ const I18N = {
     tipVolume: 'Ajusta el nivel de volumen de Spotify.',
     tipDeviceTitle: 'Dispositivo de reproducción',
     tipDevice: 'Selecciona el dispositivo activo de Spotify Connect (Mac, Teléfono, Altavoz).',
+    tipPlayTrackTitle: 'Reproducir canción',
+    tipPlayTrack: 'Reproduce esta canción directamente en Spotify y encola las siguientes.',
+    tipPauseTrackTitle: 'Pausar canción',
+    tipPauseTrack: 'Pausa la reproducción en Spotify.',
+    tipResumeTrackTitle: 'Reanudar canción',
+    tipResumeTrack: 'Reanuda la reproducción de esta canción en Spotify.',
     
     // Discovery Engine
     discoveryPanelHeading: 'Motor de Descubrimiento',
@@ -1750,8 +1762,9 @@ function renderTracksTable() {
 }
 
 // --- Active List & Direct Track Playback ---
-async function playTrackUris(uris, startingTitle = '') {
+async function playTrackUris(uris, startingTitle = '', sourceName = '') {
   if (!uris || uris.length === 0) return;
+  const isEs = state.currentLang === 'es';
   try {
     await api('/api/player/play', {
       method: 'POST',
@@ -1762,14 +1775,64 @@ async function playTrackUris(uris, startingTitle = '') {
       })
     });
     if (startingTitle) {
-      showToast(`▶ Playing "${startingTitle}" from Surprise Me`);
+      if (sourceName) {
+        showToast(isEs ? `▶ Reproduciendo "${startingTitle}" (${sourceName})` : `▶ Playing "${startingTitle}" (${sourceName})`);
+      } else {
+        showToast(isEs ? `▶ Reproduciendo "${startingTitle}"` : `▶ Playing "${startingTitle}"`);
+      }
     } else {
-      showToast(`▶ Playing ${uris.length} song${uris.length === 1 ? '' : 's'} directly`);
+      showToast(isEs ? `▶ Reproduciendo ${uris.length} canción${uris.length === 1 ? '' : 'es'}` : `▶ Playing ${uris.length} song${uris.length === 1 ? '' : 's'}`);
     }
     pollPlayerState();
   } catch (e) {
-    showToast('Playback error: ' + e.message, 'error');
+    showToast((isEs ? 'Error de reproducción: ' : 'Playback error: ') + e.message, 'error');
   }
+}
+
+async function handlePlayRightTrack(track, index, sourceListType) {
+  if (!track) return;
+  const isEs = state.currentLang === 'es';
+  let list = [];
+  let sourceName = '';
+
+  if (sourceListType === 'discovery') {
+    list = state.discovery.discoveredTracks || [];
+    sourceName = isEs ? '¡Sorpréndeme!' : 'Surprise Me';
+  } else {
+    list = state.rightTracks || [];
+    if (state.rightTab === 'search') {
+      sourceName = isEs ? 'Búsqueda' : 'Search';
+    } else if (state.rightTab === 'playlist') {
+      sourceName = isEs ? 'Playlists' : 'Playlists';
+    } else {
+      sourceName = isEs ? 'Resultados' : 'Results';
+    }
+  }
+
+  // If already playing this song, toggle play/pause
+  const isCurrentPlaying = (
+    (state.currentPlayingTrackId && (track.id === state.currentPlayingTrackId || (track.uri && track.uri === state.currentPlayingTrackId))) ||
+    (state.currentPlayingTrackTitle && track.title && track.title.toLowerCase().trim() === state.currentPlayingTrackTitle.toLowerCase().trim())
+  );
+
+  if (isCurrentPlaying) {
+    try {
+      await api('/api/player/control', { method: 'POST', body: JSON.stringify({ action: 'playpause' }) });
+      pollPlayerState();
+    } catch (e) {
+      showToast((isEs ? 'Error al pausar/reanudar: ' : 'Playback toggle error: ') + e.message, 'error');
+    }
+    return;
+  }
+
+  const trackUri = track.uri || (track.id ? `spotify:track:${track.id}` : null);
+  if (!trackUri) return;
+
+  const uris = (list && list.length > 0 && index >= 0 && index < list.length)
+    ? list.slice(index).map(t => t.uri || `spotify:track:${t.id}`).filter(Boolean)
+    : [trackUri];
+
+  await playTrackUris(uris.length > 0 ? uris : [trackUri], track.title, sourceName);
 }
 
 async function playFromIndex(startIndex) {
@@ -2407,13 +2470,29 @@ function renderRightItems() {
     const row = document.createElement('div');
     row.className = 'right-item-row';
     row.dataset.trackId = track.id;
+    row.dataset.trackUri = track.uri || (track.id ? `spotify:track:${track.id}` : '');
+    row.dataset.trackTitle = track.title || '';
     row.dataset.index = index;
     row.draggable = true;
+
+    const isThisPlaying = (
+      (state.currentPlayingTrackId && (track.id === state.currentPlayingTrackId || (track.uri && track.uri === state.currentPlayingTrackId))) ||
+      (state.currentPlayingTrackTitle && track.title && track.title.toLowerCase().trim() === state.currentPlayingTrackTitle.toLowerCase().trim())
+    );
+    if (isThisPlaying) {
+      row.classList.add('now-playing-row');
+    }
 
     // Small Album Art
     const imgHtml = track.album_art_url
       ? `<img class="track-album-art" style="width:24px;height:24px;" src="${track.album_art_url}" alt="" loading="lazy">`
       : `<div class="track-album-art-placeholder" style="width:24px;height:24px;font-size:10px;">🎵</div>`;
+
+    const playBtnTitle = isThisPlaying
+      ? (state.currentLang === 'es' ? 'Pausar/Reanudar reproducción' : 'Pause/Resume playback')
+      : (state.currentLang === 'es' ? 'Reproducir canción' : 'Play track');
+
+    const addBtnTitle = state.currentLang === 'es' ? 'Añadir a lista principal' : 'Add to main list';
 
     row.innerHTML = `
       ${imgHtml}
@@ -2423,8 +2502,13 @@ function renderRightItems() {
           <span class="right-item-artist">${escapeHtml(track.artist)}</span>
         </div>
       </div>
-      <span class="right-item-dur">${formatDuration(track.duration_ms)}</span>
-      <button class="right-item-add-btn" title="Add to main list">+ Add</button>
+      <div class="right-item-actions">
+        <span class="right-item-dur">${formatDuration(track.duration_ms)}</span>
+        <button class="right-item-play-btn ${isThisPlaying ? 'playing' : ''}" title="${escapeHtml(playBtnTitle)}" data-tooltip-title="${isThisPlaying ? t('tipPauseTrackTitle') : t('tipPlayTrackTitle')}" data-tooltip="${isThisPlaying ? t('tipPauseTrack') : t('tipPlayTrack')}">
+          ${isThisPlaying ? '🔊' : '▶'}
+        </button>
+        <button class="right-item-add-btn" title="${escapeHtml(addBtnTitle)}">+ Add</button>
+      </div>
     `;
 
     row.addEventListener('mousedown', (e) => {
@@ -2434,11 +2518,29 @@ function renderRightItems() {
     });
 
     row.addEventListener('click', (e) => {
-      if (e.target.classList.contains('right-item-add-btn')) return;
+      if (e.target.closest('.right-item-add-btn') || e.target.closest('.right-item-play-btn') || e.target.closest('.track-album-art') || e.target.closest('.track-album-art-placeholder')) return;
       handleRightRowClick(e, track.id, index);
     });
 
-    row.querySelector('.right-item-add-btn').addEventListener('click', (e) => {
+    row.querySelector('.right-item-play-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handlePlayRightTrack(track, index, 'rightTracks');
+    });
+
+    const albumArtEl = row.querySelector('.track-album-art, .track-album-art-placeholder');
+    if (albumArtEl) {
+      albumArtEl.title = state.currentLang === 'es' ? 'Reproducir canción' : 'Play track';
+      albumArtEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        handlePlayRightTrack(track, index, 'rightTracks');
+      });
+    }
+
+    row.addEventListener('dblclick', () => {
+      handlePlayRightTrack(track, index, 'rightTracks');
+    });
+
+    row.querySelector('.right-item-add-btn')?.addEventListener('click', (e) => {
       e.stopPropagation();
       insertTracksIntoMainPanel([track], state.tracks.length);
     });
@@ -3098,8 +3200,18 @@ function renderDiscoveryResultsItems(tracks) {
     const row = document.createElement('div');
     row.className = 'right-item-row';
     row.dataset.trackId = track.id;
+    row.dataset.trackUri = track.uri || (track.id ? `spotify:track:${track.id}` : '');
+    row.dataset.trackTitle = track.title || '';
     row.dataset.index = index;
     row.draggable = true;
+
+    const isThisPlaying = (
+      (state.currentPlayingTrackId && (track.id === state.currentPlayingTrackId || (track.uri && track.uri === state.currentPlayingTrackId))) ||
+      (state.currentPlayingTrackTitle && track.title && track.title.toLowerCase().trim() === state.currentPlayingTrackTitle.toLowerCase().trim())
+    );
+    if (isThisPlaying) {
+      row.classList.add('now-playing-row');
+    }
 
     // Selection Checkbox
     const chk = document.createElement('input');
@@ -3110,16 +3222,7 @@ function renderDiscoveryResultsItems(tracks) {
       e.stopPropagation();
       toggleRightSelection(track.id, e.shiftKey, index);
     });
-
-    // Play Direct Button
-    const playBtn = document.createElement('button');
-    playBtn.className = 'disc-item-play-btn';
-    playBtn.title = 'Play song directly in Spotify';
-    playBtn.textContent = '▶';
-    playBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      playTrackUris([track.uri], track.title);
-    });
+    row.appendChild(chk);
 
     // Small Album Art
     const imgHtml = track.album_art_url
@@ -3158,30 +3261,60 @@ function renderDiscoveryResultsItems(tracks) {
     `;
     row.appendChild(metaWrap);
 
+    const actionsWrap = document.createElement('div');
+    actionsWrap.className = 'right-item-actions';
+
     const durSpan = document.createElement('span');
     durSpan.className = 'right-item-dur';
     durSpan.textContent = formatDuration(track.duration_ms);
-    row.appendChild(durSpan);
+    actionsWrap.appendChild(durSpan);
+
+    const playBtnTitle = isThisPlaying
+      ? (state.currentLang === 'es' ? 'Pausar/Reanudar reproducción' : 'Pause/Resume playback')
+      : (state.currentLang === 'es' ? 'Reproducir canción' : 'Play track');
+
+    const playBtn = document.createElement('button');
+    playBtn.className = `right-item-play-btn disc-item-play-btn ${isThisPlaying ? 'playing' : ''}`;
+    playBtn.title = playBtnTitle;
+    playBtn.setAttribute('data-tooltip-title', isThisPlaying ? t('tipPauseTrackTitle') : t('tipPlayTrackTitle'));
+    playBtn.setAttribute('data-tooltip', isThisPlaying ? t('tipPauseTrack') : t('tipPlayTrack'));
+    playBtn.textContent = isThisPlaying ? '🔊' : '▶';
+    playBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handlePlayRightTrack(track, index, 'discovery');
+    });
+    actionsWrap.appendChild(playBtn);
 
     const addBtn = document.createElement('button');
     addBtn.className = 'right-item-add-btn';
-    addBtn.title = 'Add to main workspace';
+    addBtn.title = state.currentLang === 'es' ? 'Añadir a lista principal' : 'Add to main workspace';
     addBtn.textContent = '+ Add';
     addBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       insertTracksIntoMainPanel([track], state.tracks.length);
     });
-    row.appendChild(addBtn);
+    actionsWrap.appendChild(addBtn);
+
+    row.appendChild(actionsWrap);
+
+    const albumArtEl = metaWrap.querySelector('.track-album-art, .track-album-art-placeholder');
+    if (albumArtEl) {
+      albumArtEl.title = state.currentLang === 'es' ? 'Reproducir canción' : 'Play track';
+      albumArtEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        handlePlayRightTrack(track, index, 'discovery');
+      });
+    }
 
     // Row selection on click
     row.addEventListener('click', (e) => {
-      if (e.target.classList.contains('right-item-add-btn') || e.target.classList.contains('disc-item-play-btn') || e.target.type === 'checkbox') return;
+      if (e.target.closest('.right-item-add-btn') || e.target.closest('.right-item-play-btn') || e.target.closest('.disc-item-play-btn') || e.target.closest('.track-album-art') || e.target.closest('.track-album-art-placeholder') || e.target.type === 'checkbox') return;
       handleRightRowClick(e, track.id, index);
     });
 
     // Double click to play directly
     row.addEventListener('dblclick', () => {
-      playTrackUris([track.uri], track.title);
+      handlePlayRightTrack(track, index, 'discovery');
     });
 
     // Multi-Select and Drag support
@@ -3334,6 +3467,35 @@ function updatePlayerUI(data) {
       }
     });
 
+    // Update right panel items (Search, Playlists, Discovery results)
+    const sideRows = document.querySelectorAll('.right-item-row');
+    sideRows.forEach(sRow => {
+      const sId = sRow.dataset.trackId;
+      const sUri = sRow.dataset.trackUri;
+      const sTitle = sRow.dataset.trackTitle;
+      const isSideTrack = (
+        (item.id && (sId === item.id || sUri === item.id)) ||
+        (item.uri && sUri === item.uri) ||
+        (sTitle && item.title && sTitle.toLowerCase().trim() === item.title.toLowerCase().trim())
+      );
+      sRow.classList.toggle('now-playing-row', isSideTrack);
+      const playBtn = sRow.querySelector('.right-item-play-btn');
+      if (playBtn) {
+        if (isSideTrack) {
+          playBtn.classList.add('playing');
+          playBtn.textContent = isPlaying ? '🔊' : '▶';
+          const pTitle = isPlaying
+            ? (state.currentLang === 'es' ? 'Pausar reproducción' : 'Pause playback')
+            : (state.currentLang === 'es' ? 'Reanudar reproducción' : 'Resume playback');
+          playBtn.title = pTitle;
+        } else {
+          playBtn.classList.remove('playing');
+          playBtn.textContent = '▶';
+          playBtn.title = state.currentLang === 'es' ? 'Reproducir canción' : 'Play track';
+        }
+      }
+    });
+
     // Auto-scroll to center
     if (state.autoScrollLocked) {
       const activeRow = DOM.tracksTbody.querySelector('.track-row.now-playing-row');
@@ -3348,6 +3510,13 @@ function updatePlayerUI(data) {
     DOM.playerArtist.textContent = 'Open Spotify on Mac or Android';
     DOM.ctrlPlaypause.textContent = '▶️';
     DOM.progressBarFill.style.width = '0%';
+
+    document.querySelectorAll('.right-item-row.now-playing-row').forEach(r => r.classList.remove('now-playing-row'));
+    document.querySelectorAll('.right-item-play-btn').forEach(btn => {
+      btn.classList.remove('playing');
+      btn.textContent = '▶';
+      btn.title = state.currentLang === 'es' ? 'Reproducir canción' : 'Play track';
+    });
   }
 }
 

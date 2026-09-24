@@ -639,11 +639,89 @@ body {
 }
 .right-item-tags { display: flex; gap: 2px; }
 
+.right-item-row .track-album-art,
+.right-item-row .track-album-art-placeholder {
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  flex-shrink: 0;
+}
+.right-item-row .track-album-art:hover,
+.right-item-row .track-album-art-placeholder:hover {
+  transform: scale(1.08);
+  opacity: 0.9;
+}
+
+.right-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .right-item-dur {
   font-size: 10px;
   color: var(--text-muted);
   white-space: nowrap;
 }
+
+.right-item-play-btn,
+.disc-item-play-btn {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  line-height: 1;
+  padding: 0;
+  padding-left: 2px; /* Visual center for ▶ symbol */
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.right-item-row:hover .right-item-play-btn,
+.right-item-row:hover .disc-item-play-btn {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.right-item-play-btn:hover,
+.disc-item-play-btn:hover {
+  background-color: var(--spotify-green) !important;
+  border-color: var(--spotify-green) !important;
+  color: #000 !important;
+  transform: scale(1.14);
+}
+
+.right-item-play-btn.playing,
+.disc-item-play-btn.playing {
+  background-color: var(--spotify-green);
+  border-color: var(--spotify-green);
+  color: #000;
+  padding-left: 0;
+  font-size: 10px;
+  box-shadow: 0 0 8px rgba(29, 185, 84, 0.4);
+}
+
+.right-item-row.now-playing-row {
+  border-left: 2px solid var(--spotify-green);
+  background-color: rgba(29, 185, 84, 0.12) !important;
+}
+
+.right-item-row.now-playing-row .right-item-title {
+  color: var(--spotify-green) !important;
+  font-weight: 700;
+}
+
 .right-item-add-btn {
   background: transparent;
   color: var(--spotify-green);
