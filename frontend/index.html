@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kiki's Spotify Mixer</title>
   <link rel="icon" type="image/jpeg" href="/icon.jpeg">
-  <link rel="stylesheet" href="/style.css?v=6.0">
+  <link rel="stylesheet" href="/style.css?v=7.2">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -164,12 +164,29 @@
           <table id="tracks-table">
             <thead>
               <tr>
-                <th class="col-check"><input type="checkbox" id="select-all-checkbox" data-tooltip-title="Select All" data-tooltip="Toggle selection of all visible tracks in the list." data-tooltip-shortcut="Cmd+A"></th>
-                <th class="col-num sortable" data-sort="order_index" data-tooltip-title="Sort by Number" data-tooltip="Sort tracks by custom sequence order.">#</th>
-                <th class="col-title sortable" data-sort="title" data-tooltip-title="Sort by Title" data-tooltip="Sort tracks alphabetically by song title.">Title</th>
-                <th class="col-artist sortable" data-sort="artist" data-tooltip-title="Sort by Artist" data-tooltip="Sort tracks alphabetically by primary artist name.">Artist</th>
-                <th class="col-album sortable" data-sort="album" data-tooltip-title="Sort by Album" data-tooltip="Sort tracks alphabetically by album name.">Album</th>
-                <th class="col-duration sortable" data-sort="duration_ms" data-tooltip-title="Sort by Duration" data-tooltip="Sort tracks from shortest to longest duration.">⏱️</th>
+                <th class="col-num sortable" data-col="num" data-sort="order_index" data-tooltip-title="Play / Order" data-tooltip="Sort tracks by sequence order.">
+                  <span class="col-header-text">▶</span>
+                  <div class="col-resizer" title="Drag to resize column (double-click to reset)"></div>
+                </th>
+                <th class="col-title sortable" data-col="title" data-sort="title" data-tooltip-title="Sort by Title" data-tooltip="Sort tracks alphabetically by song title.">
+                  <span class="col-header-text">Title</span>
+                  <div class="col-resizer" title="Drag to resize column (double-click to reset)"></div>
+                </th>
+                <th class="col-artist sortable" data-col="artist" data-sort="artist" data-tooltip-title="Sort by Artist" data-tooltip="Sort tracks alphabetically by primary artist name.">
+                  <span class="col-header-text">Artist</span>
+                  <div class="col-resizer" title="Drag to resize column (double-click to reset)"></div>
+                </th>
+                <th class="col-album sortable" data-col="album" data-sort="album" data-tooltip-title="Sort by Album" data-tooltip="Sort tracks alphabetically by album name.">
+                  <span class="col-header-text">Album</span>
+                  <div class="col-resizer" title="Drag to resize column (double-click to reset)"></div>
+                </th>
+                <th class="col-like" data-col="like" data-tooltip-title="Liked Songs" data-tooltip="Save songs to Liked Songs">
+                  <span class="col-header-text">&nbsp;</span>
+                  <div class="col-resizer" title="Drag to resize column (double-click to reset)"></div>
+                </th>
+                <th class="col-duration sortable" data-col="duration" data-sort="duration_ms" data-tooltip-title="Sort by Duration" data-tooltip="Sort tracks from shortest to longest duration.">
+                  <span class="col-header-text">⏱️</span>
+                </th>
               </tr>
             </thead>
             <tbody id="tracks-tbody"></tbody>
@@ -524,6 +541,7 @@
   <!-- Custom Right-Click Context Menu for Tracks -->
   <div id="custom-context-menu" class="context-menu hidden">
     <div class="context-item" id="ctx-play-now">▶ Play from Here</div>
+    <div class="context-item" id="ctx-toggle-like">💚 Save to Liked Songs</div>
     <div class="context-item" id="ctx-true-shuffle">🔀 True Shuffle Selected</div>
     <div class="context-item" id="ctx-make-playlist">➕ Make Spotify Playlist...</div>
     <div class="context-divider"></div>
@@ -646,6 +664,6 @@
 
   <div id="toast-container" class="toast-container"></div>
 
-  <script src="/app.js?v=6.0"></script>
+  <script src="/app.js?v=7.2"></script>
 </body>
 </html>

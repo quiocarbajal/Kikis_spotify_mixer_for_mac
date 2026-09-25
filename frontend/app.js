@@ -63,6 +63,7 @@ const state = {
   authenticated: false,
   isSyncing: false,
   hasSyncedTracks: false,
+  likedTrackIds: new Set(),
   currentLang: localStorage.getItem('kiki_spotify_lang') || 'es'
 };
 
@@ -229,6 +230,7 @@ const DOM = {
   
   // Context Menus
   customContextMenu: document.getElementById('custom-context-menu'),
+  ctxToggleLike: document.getElementById('ctx-toggle-like'),
   playlistContextMenu: document.getElementById('playlist-context-menu'),
   toastContainer: document.getElementById('toast-container')
 };
@@ -316,12 +318,16 @@ const I18N = {
     
     // Context Menu
     ctxPlayFromHere: '▶ Play from Here',
+    ctxSaveToLiked: '💚 Save to Liked Songs',
+    ctxRemoveFromLiked: '🤍 Remove from Liked Songs',
     ctxTrueShuffleSelected: '🔀 True Shuffle Selected',
     ctxMakePlaylist: '➕ Make Spotify Playlist...',
     ctxRemoveFromList: '🗑️ Remove Selected from List',
     ctxKeepOnlySelected: '🎯 Keep Only Selected (Remove Others)',
     toastRemovedFromList: '🗑️ Removed {count} track{s} from active list (Cmd+Z to undo)',
     toastKeptOnlySelected: '🎯 Kept {kept} track{s}, removed {removed} other{s} (Cmd+Z to undo)',
+    toastAddedToLiked: '💚 Saved to Liked Songs',
+    toastRemovedFromLiked: '🤍 Removed from Liked Songs',
     ctxRenamePlaylist: '✏️ Rename Playlist',
     ctxDeletePlaylist: '🗑️ Delete Playlist',
     
@@ -586,12 +592,16 @@ const I18N = {
     
     // Context Menu
     ctxPlayFromHere: '▶ Reproducir desde aquí',
+    ctxSaveToLiked: '💚 Guardar en Canciones que te gustan',
+    ctxRemoveFromLiked: '🤍 Quitar de Canciones que te gustan',
     ctxTrueShuffleSelected: '🔀 Aleatorio Real de seleccionadas',
     ctxMakePlaylist: '➕ Crear playlist en Spotify...',
     ctxRemoveFromList: '🗑️ Quitar seleccionadas de la lista',
     ctxKeepOnlySelected: '🎯 Mantener solo seleccionadas (Quitar las demás)',
     toastRemovedFromList: '🗑️ Se quitaron {count} canción{s} de la lista activa (Cmd+Z para deshacer)',
     toastKeptOnlySelected: '🎯 Se mantuvieron {kept} canción{es}, se quitaron {removed} restante{s} (Cmd+Z para deshacer)',
+    toastAddedToLiked: '💚 Guardada en Canciones que te gustan',
+    toastRemovedFromLiked: '🤍 Quitada de Canciones que te gustan',
     ctxRenamePlaylist: '✏️ Renombrar playlist',
     ctxDeletePlaylist: '🗑️ Eliminar playlist',
     
@@ -933,24 +943,29 @@ function applyLanguage(lang) {
   }
   const thTitle = document.querySelector('th[data-sort="title"]');
   if (thTitle) {
-    thTitle.textContent = t('colTitle');
+    const textEl = thTitle.querySelector('.col-header-text') || thTitle;
+    textEl.textContent = t('colTitle');
     thTitle.setAttribute('data-tooltip-title', t('tipSortTitleTitle'));
     thTitle.setAttribute('data-tooltip', t('tipSortTitle'));
   }
   const thArtist = document.querySelector('th[data-sort="artist"]');
   if (thArtist) {
-    thArtist.textContent = t('colArtist');
+    const textEl = thArtist.querySelector('.col-header-text') || thArtist;
+    textEl.textContent = t('colArtist');
     thArtist.setAttribute('data-tooltip-title', t('tipSortArtistTitle'));
     thArtist.setAttribute('data-tooltip', t('tipSortArtist'));
   }
   const thAlbum = document.querySelector('th[data-sort="album"]');
   if (thAlbum) {
-    thAlbum.textContent = t('colAlbum');
+    const textEl = thAlbum.querySelector('.col-header-text') || thAlbum;
+    textEl.textContent = t('colAlbum');
     thAlbum.setAttribute('data-tooltip-title', t('tipSortAlbumTitle'));
     thAlbum.setAttribute('data-tooltip', t('tipSortAlbum'));
   }
   const thDur = document.querySelector('th[data-sort="duration_ms"]');
   if (thDur) {
+    const textEl = thDur.querySelector('.col-header-text') || thDur;
+    textEl.textContent = t('colDuration');
     thDur.setAttribute('data-tooltip-title', t('tipSortDurationTitle'));
     thDur.setAttribute('data-tooltip', t('tipSortDuration'));
   }
@@ -1157,6 +1172,12 @@ function applyLanguage(lang) {
   // Context Menus
   const ctxPlay = document.getElementById('ctx-play-now');
   if (ctxPlay) ctxPlay.textContent = t('ctxPlayFromHere');
+  const ctxToggleLike = document.getElementById('ctx-toggle-like');
+  if (ctxToggleLike) {
+    const track = state.tracks[contextMenuIndex];
+    const isLiked = track ? (state.likedTrackIds.has(track.id) || Boolean(track.is_liked)) : false;
+    ctxToggleLike.textContent = isLiked ? t('ctxRemoveFromLiked') : t('ctxSaveToLiked');
+  }
   const ctxShuffle = document.getElementById('ctx-true-shuffle');
   if (ctxShuffle) ctxShuffle.textContent = t('ctxTrueShuffleSelected');
   const ctxPl = document.getElementById('ctx-make-playlist');
@@ -1297,6 +1318,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   try { initEventListeners(); } catch (e) { console.error('initEventListeners error:', e); }
   try { initRightPanel(); } catch (e) { console.error('initRightPanel error:', e); }
   try { initPanelResizers(); } catch (e) { console.error('initPanelResizers error:', e); }
+  try { initTableColumnResizing(); } catch (e) { console.error('initTableColumnResizing error:', e); }
   try { initWorkspaceContainerDrop(); } catch (e) { console.error('initWorkspaceContainerDrop error:', e); }
 
   const isAuthRedirect = window.location.search.includes('auth=success');
@@ -1306,6 +1328,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const statusData = await checkStatus();
   if (state.authenticated) {
+    try { await loadLikedTrackIds(); } catch (e) {}
     try { await loadPlaylists(); } catch (e) {}
     try { await loadTracks(); } catch (e) {}
     
@@ -1387,6 +1410,134 @@ function initPanelResizers() {
         document.body.style.userSelect = '';
       }
     });
+  }
+}
+
+// --- Table Column Resizing (Dynamic responsive auto-fit + manual widening) ---
+function initTableColumnResizing() {
+  const table = document.getElementById('tracks-table');
+  if (!table) return;
+
+  const MIN_WIDTHS = {
+    num: 32,
+    title: 80,
+    artist: 60,
+    album: 50,
+    like: 32,
+    duration: 42
+  };
+
+  // 1. Restore saved column widths ONLY if explicitly customized by user
+  let savedWidths = null;
+  try {
+    const raw = localStorage.getItem('kiki_column_widths_v2');
+    if (raw) savedWidths = JSON.parse(raw);
+  } catch (e) {}
+
+  const ths = Array.from(table.querySelectorAll('thead th'));
+
+  if (savedWidths && typeof savedWidths === 'object') {
+    let totalExplicitWidth = 0;
+    ths.forEach(th => {
+      const colKey = th.dataset.col;
+      if (colKey && savedWidths[colKey]) {
+        const w = Math.max(MIN_WIDTHS[colKey] || 32, savedWidths[colKey]);
+        th.style.width = `${w}px`;
+        totalExplicitWidth += w;
+      }
+    });
+    if (totalExplicitWidth > 0) {
+      table.style.width = `${totalExplicitWidth}px`;
+    }
+  } else {
+    // Clean up any stale inline widths so dynamic responsive CSS rules apply
+    ths.forEach(th => th.style.width = '');
+    table.style.width = '';
+  }
+
+  // 2. Attach resize events to each column's resizer handle
+  ths.forEach(th => {
+    const colKey = th.dataset.col;
+    let resizer = th.querySelector('.col-resizer');
+    if (!resizer && colKey && colKey !== 'duration') {
+      resizer = document.createElement('div');
+      resizer.className = 'col-resizer';
+      resizer.title = 'Drag to resize column (double-click to reset to dynamic auto-fit)';
+      th.appendChild(resizer);
+    }
+    if (!resizer) return;
+
+    resizer.addEventListener('click', (e) => e.stopPropagation());
+
+    // Double click to reset all columns back to dynamic responsive percentages
+    resizer.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      ths.forEach(t => t.style.width = '');
+      table.style.width = '';
+      try {
+        localStorage.removeItem('kiki_column_widths_v2');
+        localStorage.removeItem('kiki_column_widths');
+      } catch (err) {}
+      showToast('🔄 Column widths reset to dynamic auto-fit');
+    });
+
+    resizer.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+
+      // Ensure all headers have explicit pixel widths before dragging
+      let currentTotal = 0;
+      ths.forEach(otherTh => {
+        const curW = otherTh.offsetWidth;
+        otherTh.style.width = `${curW}px`;
+        currentTotal += curW;
+      });
+      table.style.width = `${currentTotal}px`;
+
+      const startX = e.clientX;
+      const startWidth = th.offsetWidth;
+      const startTableWidth = table.offsetWidth;
+      const minW = MIN_WIDTHS[colKey] || 32;
+
+      resizer.classList.add('is-resizing');
+      document.body.classList.add('is-col-resizing');
+
+      function onMouseMove(moveEvent) {
+        const delta = moveEvent.clientX - startX;
+        const newWidth = Math.max(minW, startWidth + delta);
+        th.style.width = `${newWidth}px`;
+        table.style.width = `${startTableWidth + (newWidth - startWidth)}px`;
+      }
+
+      function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        resizer.classList.remove('is-resizing');
+        document.body.classList.remove('is-col-resizing');
+        saveAllColWidths();
+      }
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
+  });
+
+  function saveAllColWidths() {
+    try {
+      const data = {};
+      let totalW = 0;
+      ths.forEach(th => {
+        const key = th.dataset.col;
+        if (key) {
+          const w = th.offsetWidth;
+          data[key] = w;
+          totalW += w;
+        }
+      });
+      table.style.width = `${totalW}px`;
+      localStorage.setItem('kiki_column_widths_v2', JSON.stringify(data));
+    } catch (e) {}
   }
 }
 
@@ -1650,32 +1801,23 @@ function renderTracksTable() {
     tr.dataset.index = index;
     tr.draggable = !state.isOrderLocked;
 
-    // Col 1: Checkbox
-    const tdCheck = document.createElement('td');
-    tdCheck.className = 'col-check';
-    const chk = document.createElement('input');
-    chk.type = 'checkbox';
-    chk.checked = isSelected;
-    chk.addEventListener('click', (e) => {
-      e.stopPropagation();
-      toggleTrackSelection(track.id, e.shiftKey, index);
-    });
-    tdCheck.appendChild(chk);
-    tr.appendChild(tdCheck);
+    // Col 1: Play Symbol / Playing Indicator (replaces row number)
+    const tdPlay = document.createElement('td');
+    tdPlay.className = 'col-num track-num-cell';
+    const playBtnTitle = isNowPlaying
+      ? (state.currentLang === 'es' ? 'Pausar/Reanudar reproducción' : 'Pause/Resume playback')
+      : (state.currentLang === 'es' ? 'Reproducir desde esta canción' : 'Play from this song');
 
-    // Col 2: Number / Playing Indicator / Play Button
-    const tdNum = document.createElement('td');
-    tdNum.className = 'col-num track-num-cell';
-    const numDisplay = isNowPlaying ? '🔊' : (index + 1);
-    tdNum.innerHTML = `
-      <span class="track-num-text">${numDisplay}</span>
-      <button class="row-play-btn" title="Play from this song">▶</button>
-    `;
-    tdNum.querySelector('.row-play-btn').addEventListener('click', (e) => {
+    const playBtn = document.createElement('button');
+    playBtn.className = `row-play-btn ${isNowPlaying ? 'playing' : ''}`;
+    playBtn.title = playBtnTitle;
+    playBtn.textContent = isNowPlaying ? '🔊' : '▶';
+    playBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       playFromIndex(index);
     });
-    tr.appendChild(tdNum);
+    tdPlay.appendChild(playBtn);
+    tr.appendChild(tdPlay);
 
     // Col 3: Title + Small Album Art Icon
     const tdTitle = document.createElement('td');
@@ -1718,7 +1860,25 @@ function renderTracksTable() {
     tdAlbum.innerHTML = `<span class="track-album">${escapeHtml(track.album)}</span>`;
     tr.appendChild(tdAlbum);
 
-    // Col 6: Duration
+    // Col 6: Liked Songs Heart Toggle
+    const tdLike = document.createElement('td');
+    tdLike.className = 'col-like';
+    const isLiked = state.likedTrackIds.has(track.id) || Boolean(track.is_liked);
+    const likeBtn = document.createElement('button');
+    likeBtn.className = `track-like-btn ${isLiked ? 'liked' : ''}`;
+    likeBtn.dataset.trackId = track.id;
+    likeBtn.title = isLiked
+      ? (state.currentLang === 'es' ? 'Quitar de Canciones que te gustan' : 'Remove from Liked Songs')
+      : (state.currentLang === 'es' ? 'Guardar en Canciones que te gustan' : 'Save to Liked Songs');
+    likeBtn.innerHTML = getHeartSvg(isLiked);
+    likeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleToggleLikeTrack(track);
+    });
+    tdLike.appendChild(likeBtn);
+    tr.appendChild(tdLike);
+
+    // Col 7: Duration
     const tdDur = document.createElement('td');
     tdDur.className = 'col-duration';
     tdDur.textContent = formatDuration(track.duration_ms);
@@ -1733,6 +1893,7 @@ function renderTracksTable() {
 
     // Click Handlers (Cmd+Click, Shift+Click, normal click saves anchor)
     tr.addEventListener('click', (e) => {
+      if (e.target.closest('.row-play-btn') || e.target.closest('.track-like-btn') || e.target.type === 'checkbox') return;
       handleRowClick(e, track.id, index);
     });
 
@@ -1833,6 +1994,109 @@ async function handlePlayRightTrack(track, index, sourceListType) {
     : [trackUri];
 
   await playTrackUris(uris.length > 0 ? uris : [trackUri], track.title, sourceName);
+}
+
+// --- Liked Songs Management ---
+function getHeartSvg(isLiked) {
+  if (isLiked) {
+    return `<svg class="heart-icon liked" viewBox="0 0 24 24" width="15" height="15" fill="#1DB954" stroke="#1DB954" stroke-width="1"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
+  } else {
+    return `<svg class="heart-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
+  }
+}
+
+async function loadLikedTrackIds() {
+  try {
+    const res = await api('/api/tracks/liked-ids');
+    if (res && Array.isArray(res.liked_ids)) {
+      state.likedTrackIds = new Set(res.liked_ids);
+      const countLikedBadge = document.getElementById('count-liked');
+      if (countLikedBadge) {
+        countLikedBadge.textContent = res.liked_ids.length;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load liked track IDs:', e);
+  }
+}
+
+async function handleToggleLikeTrack(track) {
+  if (!track || !track.id) return;
+  const isEs = state.currentLang === 'es';
+  const currentlyLiked = state.likedTrackIds.has(track.id) || Boolean(track.is_liked);
+  const nextLiked = !currentlyLiked;
+
+  // 1. Optimistic UI update in state
+  if (nextLiked) {
+    state.likedTrackIds.add(track.id);
+  } else {
+    state.likedTrackIds.delete(track.id);
+  }
+
+  // 2. Update track object if in memory
+  track.is_liked = nextLiked;
+
+  // 3. Update all like buttons for this track across all views (queue + right panel)
+  updateTrackLikeButtonsUI(track.id, nextLiked);
+
+  // 4. Update sidebar badge count
+  const countLikedBadge = document.getElementById('count-liked');
+  if (countLikedBadge) {
+    let currentCount = parseInt(countLikedBadge.textContent, 10) || 0;
+    countLikedBadge.textContent = Math.max(0, currentCount + (nextLiked ? 1 : -1));
+  }
+
+  // 5. Toast notification
+  if (nextLiked) {
+    showToast(isEs ? `💚 Añadida a Canciones que te gustan` : `💚 Saved to Liked Songs`);
+  } else {
+    showToast(isEs ? `🤍 Quitada de Canciones que te gustan` : `🤍 Removed from Liked Songs`);
+  }
+
+  // 6. Send API request
+  try {
+    const res = await api('/api/tracks/like', {
+      method: 'POST',
+      body: JSON.stringify({
+        track_id: track.id,
+        liked: nextLiked,
+        track: {
+          id: track.id,
+          uri: track.uri || `spotify:track:${track.id}`,
+          title: track.title,
+          artist: track.artist,
+          album: track.album || '',
+          album_art_url: track.album_art_url || '',
+          duration_ms: track.duration_ms || 0
+        }
+      })
+    });
+    if (res && res.liked_count !== undefined && countLikedBadge) {
+      countLikedBadge.textContent = res.liked_count;
+    }
+  } catch (err) {
+    // Revert optimistic state on failure
+    if (nextLiked) {
+      state.likedTrackIds.delete(track.id);
+    } else {
+      state.likedTrackIds.add(track.id);
+    }
+    track.is_liked = currentlyLiked;
+    updateTrackLikeButtonsUI(track.id, currentlyLiked);
+    showToast((isEs ? 'Error al actualizar Canciones que te gustan: ' : 'Error updating Liked Songs: ') + err.message, 'error');
+  }
+}
+
+function updateTrackLikeButtonsUI(trackId, isLiked) {
+  const isEs = state.currentLang === 'es';
+  const btns = document.querySelectorAll(`.track-like-btn[data-track-id="${trackId}"], .right-item-like-btn[data-track-id="${trackId}"]`);
+  btns.forEach(btn => {
+    btn.classList.toggle('liked', isLiked);
+    btn.title = isLiked
+      ? (isEs ? 'Quitar de Canciones que te gustan' : 'Remove from Liked Songs')
+      : (isEs ? 'Guardar en Canciones que te gustan' : 'Save to Liked Songs');
+    btn.innerHTML = getHeartSvg(isLiked);
+  });
 }
 
 async function playFromIndex(startIndex) {
@@ -2005,7 +2269,9 @@ function updateSelectionUI() {
     DOM.selectionActionBar.classList.add('hidden');
   }
 
-  DOM.selectAllCheckbox.checked = count > 0 && count === state.tracks.length;
+  if (DOM.selectAllCheckbox) {
+    DOM.selectAllCheckbox.checked = count > 0 && count === state.tracks.length;
+  }
 }
 
 // --- Drag & Drop (Supports Reordering Main List + Dropping from Right Panel!) ---
@@ -2441,7 +2707,8 @@ async function executeRightSearch(query) {
     state.rightTracks = results;
     renderRightItems();
   } catch (e) {
-    DOM.rightItemsContainer.innerHTML = '<div class="search-placeholder-text">Search failed.</div>';
+    console.error('Search error:', e);
+    DOM.rightItemsContainer.innerHTML = `<div class="search-placeholder-text">Search failed: ${escapeHtml(e.message || String(e))}</div>`;
   }
 }
 
@@ -2492,9 +2759,16 @@ function renderRightItems() {
       ? (state.currentLang === 'es' ? 'Pausar/Reanudar reproducción' : 'Pause/Resume playback')
       : (state.currentLang === 'es' ? 'Reproducir canción' : 'Play track');
 
-    const addBtnTitle = state.currentLang === 'es' ? 'Añadir a lista principal' : 'Add to main list';
+    const isLiked = state.likedTrackIds.has(track.id) || Boolean(track.is_liked);
+    const likeBtnTitle = isLiked
+      ? (state.currentLang === 'es' ? 'Quitar de Canciones que te gustan' : 'Remove from Liked Songs')
+      : (state.currentLang === 'es' ? 'Guardar en Canciones que te gustan' : 'Save to Liked Songs');
+    const addBtnTitle = state.currentLang === 'es' ? 'Añadir a lista principal' : 'Add to main workspace';
 
     row.innerHTML = `
+      <button class="right-item-play-btn ${isThisPlaying ? 'playing' : ''}" title="${escapeHtml(playBtnTitle)}" data-tooltip-title="${isThisPlaying ? t('tipPauseTrackTitle') : t('tipPlayTrackTitle')}" data-tooltip="${isThisPlaying ? t('tipPauseTrack') : t('tipPlayTrack')}">
+        ${isThisPlaying ? '🔊' : '▶'}
+      </button>
       ${imgHtml}
       <div class="right-item-meta">
         <div class="right-item-title">${escapeHtml(track.title)}</div>
@@ -2503,10 +2777,10 @@ function renderRightItems() {
         </div>
       </div>
       <div class="right-item-actions">
-        <span class="right-item-dur">${formatDuration(track.duration_ms)}</span>
-        <button class="right-item-play-btn ${isThisPlaying ? 'playing' : ''}" title="${escapeHtml(playBtnTitle)}" data-tooltip-title="${isThisPlaying ? t('tipPauseTrackTitle') : t('tipPlayTrackTitle')}" data-tooltip="${isThisPlaying ? t('tipPauseTrack') : t('tipPlayTrack')}">
-          ${isThisPlaying ? '🔊' : '▶'}
+        <button class="right-item-like-btn ${isLiked ? 'liked' : ''}" data-track-id="${track.id}" title="${escapeHtml(likeBtnTitle)}">
+          ${getHeartSvg(isLiked)}
         </button>
+        <span class="right-item-dur">${formatDuration(track.duration_ms)}</span>
         <button class="right-item-add-btn" title="${escapeHtml(addBtnTitle)}">+ Add</button>
       </div>
     `;
@@ -2518,13 +2792,18 @@ function renderRightItems() {
     });
 
     row.addEventListener('click', (e) => {
-      if (e.target.closest('.right-item-add-btn') || e.target.closest('.right-item-play-btn') || e.target.closest('.track-album-art') || e.target.closest('.track-album-art-placeholder')) return;
+      if (e.target.closest('.right-item-add-btn') || e.target.closest('.right-item-play-btn') || e.target.closest('.right-item-like-btn') || e.target.closest('.track-album-art') || e.target.closest('.track-album-art-placeholder')) return;
       handleRightRowClick(e, track.id, index);
     });
 
     row.querySelector('.right-item-play-btn')?.addEventListener('click', (e) => {
       e.stopPropagation();
       handlePlayRightTrack(track, index, 'rightTracks');
+    });
+
+    row.querySelector('.right-item-like-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleToggleLikeTrack(track);
     });
 
     const albumArtEl = row.querySelector('.track-album-art, .track-album-art-placeholder');
@@ -3224,6 +3503,23 @@ function renderDiscoveryResultsItems(tracks) {
     });
     row.appendChild(chk);
 
+    // Play Button on left
+    const playBtnTitle = isThisPlaying
+      ? (state.currentLang === 'es' ? 'Pausar/Reanudar reproducción' : 'Pause/Resume playback')
+      : (state.currentLang === 'es' ? 'Reproducir canción' : 'Play track');
+
+    const playBtn = document.createElement('button');
+    playBtn.className = `right-item-play-btn disc-item-play-btn ${isThisPlaying ? 'playing' : ''}`;
+    playBtn.title = playBtnTitle;
+    playBtn.setAttribute('data-tooltip-title', isThisPlaying ? t('tipPauseTrackTitle') : t('tipPlayTrackTitle'));
+    playBtn.setAttribute('data-tooltip', isThisPlaying ? t('tipPauseTrack') : t('tipPlayTrack'));
+    playBtn.textContent = isThisPlaying ? '🔊' : '▶';
+    playBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handlePlayRightTrack(track, index, 'discovery');
+    });
+    row.appendChild(playBtn);
+
     // Small Album Art
     const imgHtml = track.album_art_url
       ? `<img class="track-album-art" style="width:24px;height:24px;border-radius:3px;object-fit:cover;" src="${track.album_art_url}" alt="" loading="lazy">`
@@ -3264,26 +3560,26 @@ function renderDiscoveryResultsItems(tracks) {
     const actionsWrap = document.createElement('div');
     actionsWrap.className = 'right-item-actions';
 
+    const isLiked = state.likedTrackIds.has(track.id) || Boolean(track.is_liked);
+    const likeBtnTitle = isLiked
+      ? (state.currentLang === 'es' ? 'Quitar de Canciones que te gustan' : 'Remove from Liked Songs')
+      : (state.currentLang === 'es' ? 'Guardar en Canciones que te gustan' : 'Save to Liked Songs');
+
+    const likeBtn = document.createElement('button');
+    likeBtn.className = `right-item-like-btn ${isLiked ? 'liked' : ''}`;
+    likeBtn.dataset.trackId = track.id;
+    likeBtn.title = likeBtnTitle;
+    likeBtn.innerHTML = getHeartSvg(isLiked);
+    likeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleToggleLikeTrack(track);
+    });
+    actionsWrap.appendChild(likeBtn);
+
     const durSpan = document.createElement('span');
     durSpan.className = 'right-item-dur';
     durSpan.textContent = formatDuration(track.duration_ms);
     actionsWrap.appendChild(durSpan);
-
-    const playBtnTitle = isThisPlaying
-      ? (state.currentLang === 'es' ? 'Pausar/Reanudar reproducción' : 'Pause/Resume playback')
-      : (state.currentLang === 'es' ? 'Reproducir canción' : 'Play track');
-
-    const playBtn = document.createElement('button');
-    playBtn.className = `right-item-play-btn disc-item-play-btn ${isThisPlaying ? 'playing' : ''}`;
-    playBtn.title = playBtnTitle;
-    playBtn.setAttribute('data-tooltip-title', isThisPlaying ? t('tipPauseTrackTitle') : t('tipPlayTrackTitle'));
-    playBtn.setAttribute('data-tooltip', isThisPlaying ? t('tipPauseTrack') : t('tipPlayTrack'));
-    playBtn.textContent = isThisPlaying ? '🔊' : '▶';
-    playBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      handlePlayRightTrack(track, index, 'discovery');
-    });
-    actionsWrap.appendChild(playBtn);
 
     const addBtn = document.createElement('button');
     addBtn.className = 'right-item-add-btn';
@@ -3308,7 +3604,7 @@ function renderDiscoveryResultsItems(tracks) {
 
     // Row selection on click
     row.addEventListener('click', (e) => {
-      if (e.target.closest('.right-item-add-btn') || e.target.closest('.right-item-play-btn') || e.target.closest('.disc-item-play-btn') || e.target.closest('.track-album-art') || e.target.closest('.track-album-art-placeholder') || e.target.type === 'checkbox') return;
+      if (e.target.closest('.right-item-add-btn') || e.target.closest('.right-item-play-btn') || e.target.closest('.disc-item-play-btn') || e.target.closest('.right-item-like-btn') || e.target.closest('.track-album-art') || e.target.closest('.track-album-art-placeholder') || e.target.type === 'checkbox') return;
       handleRightRowClick(e, track.id, index);
     });
 
@@ -3461,9 +3757,10 @@ function updatePlayerUI(data) {
       );
 
       row.classList.toggle('now-playing-row', isThisTrack);
-      const numSpan = row.querySelector('.track-num-text');
-      if (numSpan) {
-        numSpan.textContent = isThisTrack ? '🔊' : (parseInt(row.dataset.index, 10) + 1);
+      const rowPlayBtn = row.querySelector('.row-play-btn');
+      if (rowPlayBtn) {
+        rowPlayBtn.classList.toggle('playing', isThisTrack);
+        rowPlayBtn.textContent = isThisTrack ? '🔊' : '▶';
       }
     });
 
@@ -3644,6 +3941,12 @@ let contextMenuIndex = 0;
 function openContextMenu(x, y, index) {
   contextMenuIndex = index;
   hideAllContextMenus();
+  const track = state.tracks[index];
+  const ctxToggleLike = document.getElementById('ctx-toggle-like');
+  if (track && ctxToggleLike) {
+    const isLiked = state.likedTrackIds.has(track.id) || Boolean(track.is_liked);
+    ctxToggleLike.textContent = isLiked ? t('ctxRemoveFromLiked') : t('ctxSaveToLiked');
+  }
   const menu = DOM.customContextMenu;
   menu.style.left = `${Math.min(x, window.innerWidth - 200)}px`;
   menu.style.top = `${Math.min(y, window.innerHeight - 240)}px`;
@@ -3938,6 +4241,10 @@ function initEventListeners() {
 
   document.addEventListener('click', hideAllContextMenus);
   document.getElementById('ctx-play-now')?.addEventListener('click', () => playFromIndex(contextMenuIndex));
+  document.getElementById('ctx-toggle-like')?.addEventListener('click', () => {
+    const track = state.tracks[contextMenuIndex];
+    if (track) handleToggleLikeTrack(track);
+  });
   document.getElementById('ctx-true-shuffle')?.addEventListener('click', toggleTrueShuffle);
   document.getElementById('ctx-make-playlist')?.addEventListener('click', () => openCreatePlaylistModal(false));
   document.getElementById('ctx-remove-from-list')?.addEventListener('click', handleRemoveSelectedFromList);
