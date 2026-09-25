@@ -183,6 +183,10 @@ def set_playlist_tracks(playlist_id: str, track_ids: List[str]):
 def add_track_to_playlist(playlist_id: str, track_id: str):
     conn = get_db_connection()
     cursor = conn.cursor()
+    cursor.execute("SELECT 1 FROM playlist_tracks WHERE playlist_id = ? AND track_id = ?;", (playlist_id, track_id))
+    if cursor.fetchone():
+        conn.close()
+        return
     cursor.execute("SELECT MAX(order_index) FROM playlist_tracks WHERE playlist_id = ?;", (playlist_id,))
     row = cursor.fetchone()
     max_idx = (row[0] + 1) if row and row[0] is not None else 0
@@ -190,7 +194,15 @@ def add_track_to_playlist(playlist_id: str, track_id: str):
     INSERT OR REPLACE INTO playlist_tracks (playlist_id, track_id, order_index)
     VALUES (?, ?, ?);
     """, (playlist_id, track_id, max_idx))
-    cursor.execute("UPDATE playlists SET total_tracks = total_tracks + 1 WHERE id = ?;", (playlist_id,))
+    cursor.execute("UPDATE playlists SET total_tracks = (SELECT COUNT(*) FROM playlist_tracks WHERE playlist_id = ?) WHERE id = ?;", (playlist_id, playlist_id))
+    conn.commit()
+    conn.close()
+
+def remove_track_from_playlist(playlist_id: str, track_id: str):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM playlist_tracks WHERE playlist_id = ? AND track_id = ?;", (playlist_id, track_id))
+    cursor.execute("UPDATE playlists SET total_tracks = (SELECT COUNT(*) FROM playlist_tracks WHERE playlist_id = ?) WHERE id = ?;", (playlist_id, playlist_id))
     conn.commit()
     conn.close()
 
@@ -244,7 +256,8 @@ def get_tracks_query(
     
     select_clause = """
     SELECT t.id, t.uri, t.title, t.artist, t.album, t.album_art_url, t.duration_ms,
-           COALESCE(pt.order_index, 0) as order_index
+           COALESCE(pt.order_index, 0) as order_index,
+           EXISTS(SELECT 1 FROM playlist_tracks lk WHERE lk.track_id = t.id AND lk.playlist_id = 'liked_songs') as is_liked
     FROM tracks t
     """
     

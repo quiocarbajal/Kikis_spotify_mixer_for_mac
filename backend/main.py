@@ -37,6 +37,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Kiki's Spotify Mixer", lifespan=lifespan)
 
+@app.middleware("http")
+async def add_no_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
 # --- Pydantic Request Models ---
 
 class CredentialsRequest(BaseModel):
@@ -104,6 +112,11 @@ class DiscoveryMatrixRequest(BaseModel):
     target_count: Optional[int] = 30
     true_shuffle: Optional[bool] = True
     avoid_consecutive_artists: Optional[bool] = True
+
+class TrackLikeRequest(BaseModel):
+    track_id: str
+    liked: bool
+    track: Optional[Dict[str, Any]] = None
 
 # --- API Endpoints ---
 
@@ -364,6 +377,42 @@ def get_tracks(
         sort_direction=sort_direction
     )
     return {"tracks": tracks, "count": len(tracks)}
+
+@app.get("/api/tracks/liked-ids")
+def get_liked_track_ids():
+    ids = db.get_all_user_saved_track_ids()
+    return {"liked_ids": ids, "count": len(ids)}
+
+@app.post("/api/tracks/like")
+def toggle_like_track(req: TrackLikeRequest):
+    track_id = req.track_id
+    liked = req.liked
+    track_data = req.track
+
+    spotify_synced = False
+    if sp_client.is_authenticated():
+        if liked:
+            spotify_synced = sp_client.save_track_to_liked(track_id)
+        else:
+            spotify_synced = sp_client.remove_track_from_liked(track_id)
+
+    if liked:
+        if track_data:
+            db.upsert_tracks([track_data])
+        db.add_track_to_playlist("liked_songs", track_id)
+    else:
+        db.remove_track_from_playlist("liked_songs", track_id)
+
+    liked_ids = db.get_all_user_saved_track_ids()
+    new_count = len(liked_ids)
+
+    return {
+        "success": True,
+        "track_id": track_id,
+        "liked": liked,
+        "liked_count": new_count,
+        "spotify_synced": spotify_synced
+    }
 
 @app.get("/api/playlists")
 def get_playlists(force_refresh: bool = False):

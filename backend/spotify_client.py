@@ -483,6 +483,28 @@ def fetch_all_liked_songs(limit: int = 5000) -> List[Dict[str, Any]]:
     tracks, _ = fetch_all_liked_songs_with_status(limit=limit)
     return tracks
 
+def save_track_to_liked(track_id: str) -> bool:
+    sp = get_spotify_client()
+    if not sp or not track_id:
+        return False
+    try:
+        sp.current_user_saved_tracks_add(tracks=[track_id])
+        return True
+    except Exception as e:
+        print(f"Error adding track {track_id} to Spotify liked songs: {e}")
+        return False
+
+def remove_track_from_liked(track_id: str) -> bool:
+    sp = get_spotify_client()
+    if not sp or not track_id:
+        return False
+    try:
+        sp.current_user_saved_tracks_delete(tracks=[track_id])
+        return True
+    except Exception as e:
+        print(f"Error removing track {track_id} from Spotify liked songs: {e}")
+        return False
+
 def fetch_all_playlists(limit: int = 50) -> List[Dict[str, Any]]:
     sp = get_spotify_client()
     if not sp:
