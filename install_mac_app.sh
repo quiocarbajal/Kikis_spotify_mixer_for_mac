@@ -6,6 +6,16 @@ cd "$DIR"
 
 echo "🎵 Building Kiki's Spotify Mixer for macOS..."
 
+# 0. Quit any running instances of the app or backend to prevent stale processes/file locks
+echo "🛑 Closing running instances of Kiki's Spotify Mixer if any..."
+killall "Kiki's Spotify Mixer" "kiki_spotify_launcher" "kiki_backend" 2>/dev/null || true
+pkill -f "kiki_spotify_launcher" 2>/dev/null || true
+pkill -f "kiki_backend" 2>/dev/null || true
+sleep 0.5
+
+# Clear WebKit disk cache so macOS WKWebView never serves stale cached assets
+rm -rf "$HOME/Library/Caches/com.kiki.spotifymixer" 2>/dev/null || true
+
 # 1. Generate AppIcon.icns from Icon.jpeg
 if [ -f "Icon.jpeg" ]; then
     echo "🎨 Generating AppIcon.icns from Icon.jpeg..."
