@@ -3724,6 +3724,17 @@ async function pollPlayerState() {
   } catch (e) {}
 }
 
+const PLAYER_SVG_ICONS = {
+  play: `<svg class="player-svg-icon play-icon" viewBox="0 0 16 16"><path d="M3 1.713a.7.7 0 0 1 1.05-.607l10.89 6.288a.7.7 0 0 1 0 1.212L4.05 14.894A.7.7 0 0 1 3 14.288V1.713z"/></svg>`,
+  pause: `<svg class="player-svg-icon pause-icon" viewBox="0 0 16 16"><path d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7H2.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-2.6z"/></svg>`
+};
+
+function updatePlayerPlayPauseButton(isPlaying) {
+  if (!DOM.ctrlPlaypause) return;
+  DOM.ctrlPlaypause.innerHTML = isPlaying ? PLAYER_SVG_ICONS.pause : PLAYER_SVG_ICONS.play;
+  DOM.ctrlPlaypause.classList.toggle('is-playing', !!isPlaying);
+}
+
 function updatePlayerUI(data) {
   const isPlaying = data && data.is_playing;
   const item = data && data.item;
@@ -3735,7 +3746,7 @@ function updatePlayerUI(data) {
     // Bottom Bar
     DOM.playerTitle.textContent = item.title;
     DOM.playerArtist.textContent = item.artist;
-    DOM.ctrlPlaypause.textContent = isPlaying ? '⏸️' : '▶️';
+    updatePlayerPlayPauseButton(isPlaying);
 
     // Progress Bar
     const prog = data.progress_ms || 0;
@@ -3805,7 +3816,7 @@ function updatePlayerUI(data) {
     state.currentPlayingTrackTitle = null;
     DOM.playerTitle.textContent = 'Not Playing';
     DOM.playerArtist.textContent = 'Open Spotify on Mac or Android';
-    DOM.ctrlPlaypause.textContent = '▶️';
+    updatePlayerPlayPauseButton(false);
     DOM.progressBarFill.style.width = '0%';
 
     document.querySelectorAll('.right-item-row.now-playing-row').forEach(r => r.classList.remove('now-playing-row'));
