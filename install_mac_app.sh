@@ -128,14 +128,25 @@ mkdir -p "$USER_APPS" 2>/dev/null || true
 echo "📦 Installing to $USER_APPS/Kiki's Spotify Mixer.app..."
 if [ -d "$USER_APPS" ] && [ -w "$USER_APPS" ]; then
     rm -rf "$USER_APPS/$APP_DIR" 2>/dev/null || true
-    cp -R "$APP_DIR" "$USER_APPS/$APP_DIR" 2>/dev/null || true
+    cp -R "$APP_DIR" "$USER_APPS/$APP_DIR"
     echo "✅ Installed into $USER_APPS/$APP_DIR"
+else
+    echo "⚠️ Warning: $USER_APPS is not writable in current sandbox context."
 fi
 
 # Also update /Applications if writable
 if [ -w "/Applications" ]; then
+    echo "📦 Updating /Applications/$APP_DIR..."
     rm -rf "/Applications/$APP_DIR" 2>/dev/null || true
-    cp -R "$APP_DIR" "/Applications/$APP_DIR" 2>/dev/null || true
+    cp -R "$APP_DIR" "/Applications/$APP_DIR"
+    echo "✅ Updated /Applications/$APP_DIR"
+elif [ -d "/Applications/$APP_DIR" ] && [ -w "/Applications/$APP_DIR" ]; then
+    echo "📦 Updating /Applications/$APP_DIR..."
+    rm -rf "/Applications/$APP_DIR" 2>/dev/null || true
+    cp -R "$APP_DIR" "/Applications/$APP_DIR"
+    echo "✅ Updated /Applications/$APP_DIR"
+else
+    echo "ℹ️ Note: /Applications is not directly writable without admin rights."
 fi
 
 echo "✅ App bundle ready: $DIR/$APP_DIR"
